@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import sys; sys.stdout.write\\(sys.stdin.read\\(\\)\\)\")",
+      "Bash(python -c \":*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(python -c \"from PIL import Image; print\\(''PIL ok''\\)\")",
+      "Bash(node:*)",
+      "Bash(tmux -V)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

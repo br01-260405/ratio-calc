@@ -1,0 +1,5392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>比率計算アプリ</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="assets/icons/colon-icon-32.svg">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="assets/icons/colon-icon-16.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="比率計算">
+<meta name="theme-color" content="#4A90D9">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
+    font-size: 16px;
+    background: #f0f4f8;
+    color: #2d3748;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+  }
+
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    background: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 20px rgba(0,0,0,0.08);
+  }
+
+  .header {
+    background: #4A90D9;
+    color: #fff;
+    padding: 0 16px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    flex-shrink: 0;
+  }
+  .header-left { width: 72px; }
+  .header-title {
+    font-size: 17px;
+    font-weight: 700;
+    flex: 1;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 4px;
+  }
+  .header-right {
+    width: 72px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .btn-back, .btn-settings {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+  .btn-back:hover, .btn-settings:hover { background: rgba(255,255,255,0.15); }
+  .btn-settings { font-size: 20px; }
+
+  .screen {
+    display: none;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    padding: 16px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .screen.active { display: block; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 44px;
+    transition: opacity 0.15s, transform 0.1s;
+    gap: 6px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.38; cursor: not-allowed; }
+  .btn:disabled:active { transform: none; }
+  .btn-primary { background: #4A90D9; color: #fff; }
+  .btn-primary:hover { background: #357abd; }
+  .btn-secondary { background: #e2e8f0; color: #4a5568; }
+  .btn-secondary:hover { background: #cbd5e0; }
+  .btn-danger { background: #fc8181; color: #fff; }
+  .btn-danger:hover { background: #f56565; }
+  .btn-folder { background: #ebf4ff; color: #2b6cb0; }
+  .btn-folder:hover { background: #bee3f8; }
+  .btn-full { width: 100%; }
+  .btn-sm { padding: 8px 10px; font-size: 13px; min-height: 44px; }
+
+  .input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 16px;
+    color: #2d3748;
+    background: #fff;
+    transition: border-color 0.2s;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .input:focus { border-color: #4A90D9; }
+  .input-sm { padding: 8px 12px; font-size: 16px; }
+  select.input { cursor: pointer; background-image: none; }
+
+  label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 6px;
+  }
+  .form-group { margin-bottom: 16px; }
+
+  .error-msg {
+    background: #fff5f5;
+    border: 1px solid #fc8181;
+    color: #c53030;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .error-msg.show { display: block; }
+
+  /* ===== Screen 1: Recipe List ===== */
+  .screen-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 16px;
+  }
+  .recipe-list { display: flex; flex-direction: column; gap: 10px; }
+  .recipe-card {
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .recipe-card:hover, .recipe-card:active { border-color: #4A90D9; box-shadow: 0 2px 8px rgba(74,144,217,0.15); }
+  .recipe-info {
+    flex: 1;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .recipe-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 3px;
+  }
+  .recipe-summary {
+    font-size: 12px;
+    color: #718096;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .recipe-actions, .folder-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .btn-recipe-menu {
+    background: none;
+    border: none;
+    color: #a0aec0;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+    letter-spacing: 1px;
+  }
+  .btn-recipe-menu:hover, .btn-recipe-menu:active { background: #e2e8f0; color: #4a5568; }
+
+  /* ===== Bottom Sheet ===== */
+  .sheet-wrapper {
+    position: fixed;
+    inset: 0;
+    z-index: 600;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .sheet-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .sheet-overlay.visible { opacity: 1; }
+  .sheet-panel {
+    position: relative;
+    background: #fff;
+    border-radius: 14px 14px 0 0;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    transform: translateY(100%);
+    transition: transform 0.2s ease-out;
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .sheet-panel.visible { transform: translateY(0); }
+  .sheet-handle-bar {
+    width: 36px;
+    height: 4px;
+    background: #cbd5e0;
+    border-radius: 2px;
+    margin: 10px auto 8px;
+  }
+  .sheet-recipe-name {
+    font-size: 12px;
+    color: #a0aec0;
+    text-align: center;
+    padding: 0 16px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sheet-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 20px;
+    font-size: 16px;
+    color: #2d3748;
+    cursor: pointer;
+    border-top: 1px solid #f0f4f8;
+    transition: background 0.12s;
+    gap: 12px;
+  }
+  .sheet-item:hover, .sheet-item:active { background: #f7fafc; }
+  .sheet-item.danger { color: #c53030; }
+  .sheet-item.danger:hover, .sheet-item.danger:active { background: #fff5f5; }
+
+  /* ===== Duplicate highlight ===== */
+  @keyframes recipeHighlight {
+    0%   { border-left-color: transparent; }
+    8%   { border-left-color: #4A90D9; }
+    62%  { border-left-color: #4A90D9; }
+    100% { border-left-color: transparent; }
+  }
+  .recipe-card.highlight-new {
+    border-left: 3px solid transparent;
+    animation: recipeHighlight 1.3s ease forwards;
+  }
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: #a0aec0;
+  }
+  .empty-state p { font-size: 15px; line-height: 1.6; margin-top: 12px; }
+  .empty-icon { font-size: 48px; }
+
+  .add-btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .add-btn-row .btn { flex: 1; }
+
+  /* ===== Folders ===== */
+  .folder-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+  .folder-card {
+    background: #F5F8FF;
+    border: 2px solid #d0e4f7;
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    position: relative;
+  }
+  .folder-card:hover, .folder-card:active { border-color: #4A90D9; box-shadow: 0 2px 8px rgba(74,144,217,0.15); }
+  .folder-icon { font-size: 22px; flex-shrink: 0; cursor: pointer; }
+  .folder-info { flex: 1; cursor: pointer; min-width: 0; }
+  .folder-name { font-size: 15px; font-weight: 700; color: #2d3748; }
+  .folder-count { font-size: 12px; color: #718096; margin-top: 2px; }
+
+  .list-section-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0 10px;
+  }
+  .list-section-divider::before,
+  .list-section-divider::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
+  .list-section-label { font-size: 12px; color: #a0aec0; font-weight: 600; white-space: nowrap; }
+  .all-organized {
+    text-align: center;
+    padding: 20px 16px;
+    color: #a0aec0;
+    font-size: 14px;
+  }
+  .recipe-list-outer {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+    background: #f7fafc;
+  }
+
+  /* ===== Screen 2: Recipe Form ===== */
+  .section-label {
+    font-size: 15px;
+    font-weight: 700;
+    color: #4a5568;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  .ingredient-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .ingredient-name { flex: 2; }
+  .ingredient-ratio { flex: 1; }
+  .btn-remove-ingredient {
+    background: none;
+    border: 2px solid #fc8181;
+    color: #fc8181;
+    border-radius: 8px;
+    width: 36px;
+    height: 44px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .btn-remove-ingredient:hover { background: #fff5f5; }
+  .btn-remove-ingredient:disabled { opacity: 0.3; cursor: not-allowed; }
+  #ingredients-container { margin-bottom: 10px; }
+  .form-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
+
+  /* ===== Screen 3: Calculate ===== */
+  .calc-recipe-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: #4A90D9;
+    margin-bottom: 12px;
+  }
+  .ratio-info {
+    background: #f7fafc;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: #718096;
+  }
+  .ratio-info-title { font-weight: 700; color: #4a5568; margin-bottom: 6px; font-size: 13px; }
+  .ratio-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ratio-badge {
+    background: #ebf4ff;
+    color: #2b6cb0;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    margin-bottom: 16px;
+  }
+  .input-row .form-group { flex: 2; margin-bottom: 0; }
+  .input-row .form-group:last-child { flex: 1; }
+
+  .result-card {
+    background: #f7fafc;
+    border: 2px solid #bee3f8;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  .result-title { font-size: 15px; font-weight: 700; color: #2b6cb0; margin-bottom: 12px; }
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 15px;
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-name { color: #4a5568; }
+  .result-value { font-weight: 700; color: #2d3748; font-size: 17px; }
+  .result-total {
+    background: #ebf4ff;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    font-weight: 700;
+  }
+  .result-total-label { color: #2b6cb0; font-size: 15px; }
+  .result-total-value { color: #2b6cb0; font-size: 18px; }
+  .result-mode { font-size: 12px; color: #a0aec0; text-align: right; margin-top: 8px; }
+  .result-note {
+    background: #fffbeb;
+    border: 1px solid #f6e05e;
+    color: #744210;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
+  /* ===== Screen 4: Settings ===== */
+  .settings-section { margin-bottom: 24px; }
+  .settings-category {
+    font-size: 13px;
+    font-weight: 700;
+    color: #4A90D9;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+    padding: 0 4px;
+  }
+  .settings-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+  .settings-item { padding: 14px 16px; border-bottom: 1px solid #f0f4f8; }
+  .settings-item:last-child { border-bottom: none; }
+  .settings-item-label { font-size: 15px; font-weight: 600; color: #2d3748; margin-bottom: 8px; display: block; }
+  .settings-select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 16px;
+    color: #2d3748;
+    background: #fff;
+    outline: none;
+    cursor: pointer;
+  }
+  .settings-select:focus { border-color: #4A90D9; }
+  .settings-radio-group { display: flex; flex-direction: column; gap: 8px; }
+  .settings-radio-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 15px;
+    color: #2d3748;
+    padding: 6px 0;
+  }
+  .settings-radio-label input[type="radio"] { width: 18px; height: 18px; accent-color: #4A90D9; margin-top: 1px; flex-shrink: 0; }
+  .settings-radio-text { display: flex; flex-direction: column; }
+  .settings-radio-desc { font-size: 0.8em; color: #718096; margin-top: 3px; line-height: 1.4; }
+  .settings-reset-wrap { margin-top: 8px; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #2d3748;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 1000;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .divider { height: 1px; background: #e2e8f0; margin: 16px 0; }
+
+  /* ===== Drag & Drop ===== */
+  .drag-handle {
+    color: #aaa;
+    font-size: 20px;
+    line-height: 1;
+    cursor: grab;
+    min-width: 36px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    touch-action: none;
+    user-select: none;
+    border-radius: 8px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .drag-handle:hover { color: #4A90D9; background: #ebf4ff; }
+  .drag-handle:active { cursor: grabbing; }
+  .recipe-card.dragging, .folder-card.dragging { opacity: 0.45; box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
+  .recipe-card.drag-over-top,  .folder-card.drag-over-top    { border-top: 3px solid #4A90D9 !important; }
+  .recipe-card.drag-over-bottom, .folder-card.drag-over-bottom { border-bottom: 3px solid #4A90D9 !important; }
+
+  /* ===== Modal ===== */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 360px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  }
+  .modal-title { font-size: 17px; font-weight: 700; color: #2d3748; margin-bottom: 16px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-actions .btn { flex: 1; }
+  .modal-actions.vertical { flex-direction: column; gap: 8px; }
+  .modal-actions.vertical .btn { width: 100%; }
+
+  .move-options-list { max-height: 280px; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; margin: 0 -4px; }
+  .move-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 15px;
+    color: #2d3748;
+    transition: background 0.15s;
+  }
+  .move-option:hover, .move-option:active { background: #f7fafc; }
+  .move-option.selected { background: #ebf4ff; color: #2b6cb0; font-weight: 600; }
+  .move-option-icon { font-size: 18px; }
+
+  /* ===== Recipe Form Modal (bottom sheet) ===== */
+  .recipe-form-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 700;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .recipe-form-modal.visible {
+    pointer-events: auto;
+    opacity: 1;
+  }
+  .recipe-form-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+  }
+  .recipe-form-panel {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    max-height: 85dvh;
+    background: #fff;
+    border-radius: 14px 14px 0 0;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.25s ease-out;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+  }
+  .recipe-form-panel.visible {
+    transform: translateY(0);
+  }
+  .recipe-form-handle {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0 2px;
+    flex-shrink: 0;
+  }
+  .recipe-form-handle-bar {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: #cbd5e0;
+  }
+  .recipe-form-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px 12px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .recipe-form-title-text {
+    font-size: 17px;
+    font-weight: 700;
+    color: #2d3748;
+  }
+  .recipe-form-close-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #718096;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 8px;
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .recipe-form-close-btn:hover, .recipe-form-close-btn:active { background: #f7fafc; color: #2d3748; }
+  .recipe-form-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .form-details-toggle {
+    display: block;
+    width: 100%;
+    background: none;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 11px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #4a5568;
+    cursor: pointer;
+    text-align: left;
+    margin: 10px 0 0;
+    transition: background 0.15s;
+    min-height: 44px;
+  }
+  .form-details-toggle:hover, .form-details-toggle:active { background: #f7fafc; }
+  .form-details-body {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.2s ease-out;
+  }
+
+  /* ===== Tags ===== */
+  .recipe-tags-display {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 5px;
+  }
+  .tag-chip-sm {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+  }
+
+  /* Tag chips in form */
+  .form-tag-section-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 8px;
+    display: block;
+  }
+  .form-tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .tag-chip-form {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid transparent;
+    color: #fff;
+    opacity: 0.38;
+    transition: opacity 0.15s, box-shadow 0.15s;
+    white-space: nowrap;
+    user-select: none;
+    pointer-events: auto;
+  }
+  .tag-chip-form * { pointer-events: none; }
+  .tag-chip-form.selected {
+    opacity: 1;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.22);
+  }
+  .tag-chip-form:hover { opacity: 0.8; }
+  .tag-chip-form.selected:hover { opacity: 0.9; }
+  .tag-chip-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px dashed #cbd5e0;
+    background: transparent;
+    color: #718096;
+    transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .tag-chip-add:hover { border-color: #4A90D9; color: #4A90D9; }
+
+  /* ===== Tag filter area (always visible) ===== */
+  .tag-filter-area {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .tag-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .tag-filter-group-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #a0aec0;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 32px;
+  }
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #fff;
+    opacity: 0.38;
+    transition: opacity 0.15s, box-shadow 0.15s;
+    user-select: none;
+    white-space: nowrap;
+    min-height: 36px;
+  }
+  .filter-chip.active { opacity: 1; box-shadow: 0 1px 6px rgba(0,0,0,0.22); }
+  .filter-chip:hover { opacity: 0.75; }
+  .filter-chip.active:hover { opacity: 0.88; }
+
+  /* Tag modal */
+  .tag-color-presets {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .tag-preset-swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.12s, border-color 0.12s;
+    flex-shrink: 0;
+  }
+  .tag-preset-swatch:hover { transform: scale(1.1); }
+  .tag-preset-swatch:active { transform: scale(1.05); border-color: #333; }
+  .tag-preset-swatch.selected { border-color: #333; transform: scale(1.05); }
+  .tag-color-input {
+    width: 52px;
+    height: 44px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 2px;
+    background: none;
+  }
+  .tag-scope-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #2d3748;
+    padding: 5px 0;
+    font-weight: normal;
+    margin-bottom: 0;
+  }
+  .tag-scope-option input[type="radio"] { width: 16px; height: 16px; accent-color: #4A90D9; flex-shrink: 0; }
+  .tag-scope-folders {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    max-height: 140px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    transition: opacity 0.15s;
+  }
+  .tag-scope-folders.all-mode {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  .tag-scope-folder-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 14px;
+    color: #2d3748;
+    cursor: pointer;
+    font-weight: normal;
+    margin-bottom: 0;
+  }
+  .tag-scope-folder-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: #4A90D9; flex-shrink: 0; }
+  .tag-scope-folder-item.disabled {
+    color: #a0aec0;
+    cursor: default;
+  }
+  .tag-scope-folder-item.disabled input[type="checkbox"] {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  /* Tag management in settings */
+  .tag-mgmt-group-header { font-size: 12px; font-weight: 700; color: #718096; letter-spacing: 0.05em; padding: 10px 0 4px; }
+  .tag-mgmt-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+  .tag-mgmt-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #f7fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    transition: border-color 0.1s;
+  }
+  .tag-mgmt-item.dragging { opacity: 0.4; }
+  .tag-mgmt-item.drag-over-top    { border-top:    3px solid #4A90D9; }
+  .tag-mgmt-item.drag-over-bottom { border-bottom: 3px solid #4A90D9; }
+  .tag-mgmt-handle { cursor: grab; color: #cbd5e0; font-size: 18px; padding: 0 2px; flex-shrink: 0; user-select: none; touch-action: none; }
+  .tag-mgmt-handle:hover { color: #718096; }
+  .tag-mgmt-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+  .tag-mgmt-info { flex: 1; min-width: 0; }
+  .tag-mgmt-name { font-size: 14px; font-weight: 600; color: #2d3748; }
+  .tag-mgmt-scope { font-size: 11px; color: #a0aec0; margin-top: 2px; }
+  .tag-mgmt-empty { text-align: center; padding: 16px 0; color: #a0aec0; font-size: 14px; }
+  /* Calc header row with home button */
+  .calc-header-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .calc-header-row .calc-recipe-name { margin-bottom: 0; flex: 1; min-width: 0; }
+  .btn-calc-home { background: #e2e8f0; color: #4a5568; border: none; border-radius: 8px; padding: 6px 12px; font-size: 14px; font-weight: 600; cursor: pointer; flex-shrink: 0; min-height: 44px; }
+  .btn-calc-home:hover, .btn-calc-home:active { background: #cbd5e0; }
+  /* Settings toggle switch */
+  .settings-toggle-row { display: flex; align-items: center; justify-content: space-between; cursor: pointer; width: 100%; }
+  .settings-toggle-sw { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .settings-toggle-sw input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .settings-toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e0; border-radius: 24px; transition: .2s; }
+  .settings-toggle-sw input:checked + .settings-toggle-slider { background: #4A90D9; }
+  .settings-toggle-slider::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .settings-toggle-sw input:checked + .settings-toggle-slider::before { transform: translateX(20px); }
+
+  /* ===== Ingredient-based calc ===== */
+  .calc-ingredient-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 18px 0 12px;
+    color: #a0aec0;
+    font-size: 13px;
+  }
+  .calc-ingredient-divider::before,
+  .calc-ingredient-divider::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
+  .amount-btn-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .btn-amount {
+    flex: 1;
+    min-width: 48px;
+    padding: 6px 4px;
+    background: #ebf4ff;
+    color: #2b6cb0;
+    border: 1px solid #bee3f8;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .btn-amount:hover, .btn-amount:active { background: #bee3f8; }
+  .btn-amount-reset {
+    background: #fff5f5;
+    color: #c53030;
+    border-color: #fed7d7;
+  }
+  .btn-amount-reset:hover { background: #fed7d7; }
+  .total-amount-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .total-amount-lbl {
+    font-size: 13px;
+    font-weight: 600;
+    color: #4a5568;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-bottom: 0;
+  }
+  .total-amount-inp {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    font-size: 16px;
+  }
+  .unit-inp {
+    width: 52px;
+    flex-shrink: 0;
+    padding: 8px 6px;
+    font-size: 16px;
+  }
+  .btn-save-amount-btn {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    background: #4A90D9;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    min-height: 38px;
+  }
+  .btn-save-amount-btn:hover { background: #357abd; }
+  .btn-save-amount-btn:active { transform: scale(0.97); }
+  .saved-amounts-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #718096;
+    margin-bottom: 6px;
+  }
+  .saved-amounts-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .saved-amount-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #ebf4ff;
+    border: 1px solid #bee3f8;
+    border-radius: 16px;
+    padding: 4px 10px 4px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2b6cb0;
+    cursor: pointer;
+  }
+  .saved-amount-chip:hover { background: #bee3f8; }
+  .saved-amount-chip-del {
+    background: none;
+    border: none;
+    color: #90cdf4;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    margin-left: 2px;
+  }
+  .saved-amount-chip-del:hover { color: #c53030; }
+  .calc-ing-set {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+  .calc-ing-set-header {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 4px;
+  }
+  .btn-remove-calc-set {
+    background: none;
+    border: none;
+    color: #a0aec0;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .btn-remove-calc-set:hover { color: #c53030; }
+  .calc-ing-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .calc-ing-row:last-child { margin-bottom: 0; }
+  .calc-ing-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a5568;
+    min-width: 44px;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .calc-ing-input { width: 88px; flex-shrink: 0; }
+  .calc-ing-results {
+    font-size: 13px;
+    color: #4a5568;
+    flex: 1;
+    min-width: 0;
+    word-break: break-all;
+  }
+
+  @media (min-width: 480px) {
+    body { background: #e2e8f0; }
+    #app { border-radius: 0; box-shadow: 0 4px 24px rgba(0,0,0,0.12); }
+  }
+
+  /* Search bar */
+  .search-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #f7fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0 10px;
+    margin-bottom: 10px;
+    transition: border-color 0.15s;
+  }
+  .search-bar-wrap:focus-within { border-color: #4A90D9; background: #fff; }
+  .search-icon { font-size: 15px; color: #a0aec0; flex-shrink: 0; }
+  .search-bar-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 16px;
+    color: #2d3748;
+    padding: 10px 0;
+    outline: none;
+    min-width: 0;
+  }
+  .search-bar-input::placeholder { color: #a0aec0; }
+  .search-clear-btn {
+    background: none;
+    border: none;
+    color: #a0aec0;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    flex-shrink: 0;
+    line-height: 1;
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .search-clear-btn:hover { color: #4a5568; }
+
+  /* Memo */
+  .calc-memo-section {
+    margin-top: 14px;
+  }
+  .calc-memo-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 6px;
+  }
+  .calc-memo-textarea {
+    resize: none;
+    min-height: 80px;
+    overflow: hidden;
+    line-height: 1.6;
+    width: 100%;
+  }
+
+  /* ===== Tag Sort Mode ===== */
+  #tag-sort-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 150;
+  }
+  #tag-filter-bar.sort-active {
+    position: relative;
+    z-index: 200;
+    background: #fff;
+    padding: 6px 8px;
+    margin: -6px -8px;
+    border-radius: 10px;
+  }
+  .tag-sort-btn-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tag-filter-section-title {
+    flex: 1;
+    font-size: 11px;
+    font-weight: 700;
+    color: #a0aec0;
+    white-space: nowrap;
+  }
+  .tag-search-mode-btn {
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    min-height: 26px;
+    line-height: 1;
+    color: #fff;
+    background: #4A90D9;
+    flex-shrink: 0;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .tag-search-mode-btn.and-mode { background: #f60929; }
+  .tag-search-mode-btn:hover { opacity: 0.85; }
+  .tag-filter-outer {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 12px 12px;
+    background: #f7fafc;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sort-active .tag-filter-outer {
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    background: none;
+    margin-bottom: 0;
+    gap: 0;
+  }
+  .tag-filter-group-box {
+    border: 1px solid #edf2f7;
+    border-radius: 8px;
+    padding: 8px;
+    background: #fff;
+  }
+  .tag-filter-box-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #a0aec0;
+    display: block;
+    margin-bottom: 5px;
+  }
+  .btn-tag-sort {
+    background: #e2e8f0;
+    color: #4a5568;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .btn-tag-sort:hover, .btn-tag-sort:active { background: #cbd5e0; }
+  .btn-tag-sort.done { background: #4A90D9; color: #fff; }
+  .btn-tag-sort.done:hover, .btn-tag-sort.done:active { background: #357abd; }
+  .filter-chip.sort-draggable {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .filter-chip.sort-draggable:active { cursor: grabbing; }
+  .filter-chip-placeholder {
+    display: inline-flex;
+    border-radius: 20px;
+    visibility: hidden;
+    flex-shrink: 0;
+  }
+  .tag-chip-floating {
+    position: fixed;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    opacity: 1;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    transform: scale(1.08);
+    cursor: grabbing;
+    pointer-events: none;
+    z-index: 400;
+  }
+
+  /* ===== Result action buttons ===== */
+  .result-action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .result-action-row .btn { flex: 1; }
+
+  /* ===== Memo header row ===== */
+  .calc-memo-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .calc-memo-header .calc-memo-label { margin-bottom: 0; }
+
+  /* ===== Mobile: touch active feedback ===== */
+  @media (hover: none) {
+    .btn-primary:hover    { background: #4A90D9; }
+    .btn-primary:active   { background: #357abd; }
+    .btn-secondary:hover  { background: #e2e8f0; }
+    .btn-secondary:active { background: #cbd5e0; }
+    .btn-danger:hover     { background: #fc8181; }
+    .btn-danger:active    { background: #f56565; }
+    .btn-folder:hover     { background: #ebf4ff; }
+    .btn-folder:active    { background: #bee3f8; }
+    .recipe-card:hover    { border-color: #e2e8f0; box-shadow: none; }
+    .recipe-card:active   { border-color: #4A90D9; box-shadow: 0 2px 8px rgba(74,144,217,0.15); }
+    .folder-card:hover    { border-color: #d0e4f7; box-shadow: none; }
+    .folder-card:active   { border-color: #4A90D9; box-shadow: 0 2px 8px rgba(74,144,217,0.15); }
+    .btn-calc-home:hover  { background: #e2e8f0; }
+    .btn-calc-home:active { background: #cbd5e0; }
+    .btn-amount:hover     { background: #ebf4ff; }
+    .btn-amount:active    { background: #bee3f8; }
+    .btn-amount-reset:hover  { background: #fff5f5; }
+    .btn-amount-reset:active { background: #fed7d7; }
+    .btn-save-amount-btn:hover  { background: #4A90D9; }
+    .btn-save-amount-btn:active { background: #357abd; }
+    .btn-remove-ingredient:hover { background: transparent; }
+    .btn-remove-ingredient:active { background: #fff5f5; }
+    .filter-chip:hover  { opacity: 0.38; }
+    .filter-chip:active { opacity: 0.75; }
+    .filter-chip.active:hover  { opacity: 1; }
+    .filter-chip.active:active { opacity: 0.88; }
+  }
+
+  /* ===== Bulk Edit ===== */
+  .bulk-hint-text {
+    display: block;
+    text-align: right;
+    font-size: 11px;
+    color: #a0aec0;
+    margin-bottom: 4px;
+    min-height: 18px;
+  }
+  .bulk-control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    min-height: 36px;
+    gap: 8px;
+  }
+  .btn-bulk-toggle {
+    background: #e2e8f0;
+    color: #4a5568;
+    border: none;
+    border-radius: 8px;
+    padding: 5px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 36px;
+  }
+  .btn-bulk-toggle.done { background: #4A90D9; color: #fff; }
+  .bulk-checkbox-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-height: 44px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .bulk-checkbox-wrap input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #4A90D9;
+    pointer-events: none;
+  }
+  .bulk-edit-active .drag-handle { visibility: hidden; pointer-events: none; }
+  .recipe-card.bulk-checked { background: #ebf4ff; border-color: #4A90D9 !important; }
+  .folder-card.bulk-checked { background: #dceeff; border-color: #4A90D9 !important; }
+
+  #bulk-action-bar {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    width: 100%;
+    max-width: 480px;
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+    padding: 10px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 300;
+    transition: transform 0.2s ease-out;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.1);
+  }
+  #bulk-action-bar.visible { transform: translateX(-50%) translateY(0); }
+  .btn-bulk-select-all {
+    background: none;
+    border: none;
+    color: #4A90D9;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    min-height: 44px;
+  }
+  .bulk-count-label { font-size: 12px; color: #718096; flex: 1; text-align: center; }
+  .bulk-bar-actions { display: flex; gap: 8px; }
+  .bulk-bar-actions .btn { flex: 1; padding: 10px 6px; font-size: 13px; min-height: 44px; }
+  .screen.bulk-bar-open { padding-bottom: max(80px, calc(70px + env(safe-area-inset-bottom))); }
+
+  /* ===== Mobile: narrow screen layout ===== */
+  @media (max-width: 380px) {
+    .ingredient-row { flex-wrap: wrap; }
+    .ingredient-name  { flex: 1 1 55%; min-width: 0; }
+    .ingredient-ratio { flex: 1 1 30%; min-width: 60px; }
+    .btn-remove-ingredient { margin-left: auto; }
+    .total-amount-row { flex-wrap: wrap; }
+    .total-amount-lbl { flex: 1 1 100%; margin-bottom: 2px; }
+    .btn-amount { min-width: 40px; font-size: 12px; padding: 6px 2px; }
+    .calc-ing-name { max-width: 70px; font-size: 13px; }
+    .calc-ing-input { width: 76px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <button class="btn-back" id="btn-back" style="display:none" aria-label="戻る">← 戻る</button>
+    </div>
+    <div class="header-title" id="header-title">比率計算アプリ</div>
+    <div class="header-right">
+      <button class="btn-settings" id="btn-settings" aria-label="設定">⚙</button>
+    </div>
+  </header>
+
+  <!-- Screen 1: Recipe List -->
+  <div class="screen active" id="screen-list">
+    <div class="screen-title" id="list-screen-title">レシピ一覧</div>
+    <div class="search-bar-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-bar-input" id="recipe-search" placeholder="レシピ名・材料名で検索" autocomplete="off" inputmode="search">
+      <button class="search-clear-btn" id="recipe-search-clear" aria-label="クリア" style="display:none">✕</button>
+    </div>
+    <div id="tag-filter-bar"></div>
+    <div id="bulk-toolbar"></div>
+    <div id="recipe-list-container"></div>
+    <div class="add-btn-row" id="add-btn-row">
+      <button class="btn btn-primary" id="btn-new-recipe">＋ 新規登録</button>
+      <button class="btn btn-folder" id="btn-new-folder">📁 フォルダを作成</button>
+    </div>
+  </div>
+
+  <!-- Screen 3: Calculate -->
+  <div class="screen" id="screen-calc">
+    <div class="calc-header-row">
+      <div class="calc-recipe-name" id="calc-recipe-name"></div>
+      <button class="btn-calc-home" id="btn-calc-home" type="button">🏠 ホーム</button>
+    </div>
+    <div class="ratio-info">
+      <div class="ratio-info-title">材料と比率</div>
+      <div class="ratio-badges" id="calc-ratio-badges"></div>
+    </div>
+    <div class="total-amount-row">
+      <label for="input-total-amount" class="total-amount-lbl">希望の総量</label>
+      <input class="input total-amount-inp" type="number" inputmode="decimal" id="input-total-amount" placeholder="例：100" min="0">
+      <input class="input unit-inp" type="text" id="input-unit" placeholder="g" maxlength="10">
+      <button class="btn-save-amount-btn" type="button" id="saveAmountBtn">保存</button>
+    </div>
+    <div class="amount-btn-row" id="total-amount-buttons">
+      <button class="btn-amount" type="button" data-delta="10">+10</button>
+      <button class="btn-amount" type="button" data-delta="50">+50</button>
+      <button class="btn-amount" type="button" data-delta="100">+100</button>
+      <button class="btn-amount btn-amount-reset" type="button" data-delta="0">リセット</button>
+    </div>
+    <div id="saved-amounts-section" style="display:none">
+      <div class="saved-amounts-label">よく使う数値：</div>
+      <div class="saved-amounts-chips" id="saved-amounts-chips"></div>
+    </div>
+    <div id="calc-error" class="error-msg"></div>
+    <div id="calc-result" style="display:none">
+      <div class="result-card">
+        <div class="result-title">計算結果</div>
+        <div id="result-rows"></div>
+        <div class="result-total">
+          <span class="result-total-label">合計</span>
+          <span class="result-total-value" id="result-total-value"></span>
+        </div>
+        <div class="result-mode" id="result-mode"></div>
+        <div id="result-note" class="result-note" style="display:none"></div>
+      </div>
+      <div class="result-action-row">
+        <button class="btn btn-secondary btn-sm" id="btn-total-copy" type="button">コピー</button>
+        <button class="btn btn-secondary btn-sm" id="btn-total-memo" type="button">メモに出力</button>
+      </div>
+    </div>
+    <div class="calc-ingredient-divider"><span>または材料から計算</span></div>
+    <div id="calc-ingredient-sets"></div>
+    <button class="btn btn-secondary btn-sm" id="btn-add-calc-set" type="button">＋ 計算欄を追加</button>
+    <div class="calc-memo-section">
+      <div class="calc-memo-header">
+        <label class="calc-memo-label" for="calc-memo-textarea">メモ</label>
+        <button class="btn btn-secondary btn-sm" id="btn-memo-copy" type="button" disabled>コピー</button>
+      </div>
+      <textarea class="input calc-memo-textarea" id="calc-memo-textarea" placeholder="メモを入力できます" rows="3"></textarea>
+    </div>
+  </div>
+
+  <!-- Screen 4: Settings -->
+  <div class="screen" id="screen-settings">
+    <div id="settings-container"></div>
+    <div class="settings-reset-wrap">
+      <button class="btn btn-secondary btn-full" id="btn-reset-settings">設定をリセット</button>
+    </div>
+  </div>
+
+  <!-- Bulk Action Bar -->
+  <div id="bulk-action-bar">
+    <div class="bulk-bar-actions">
+      <button class="btn btn-danger" id="btn-bulk-delete">一括削除</button>
+      <button class="btn btn-secondary" id="btn-bulk-move">フォルダに移動</button>
+      <button class="btn btn-secondary" id="btn-bulk-add-tag">タグを編集</button>
+    </div>
+  </div>
+</div>
+
+<!-- Recipe Form Modal -->
+<div id="modal-recipe-form" class="recipe-form-modal" style="display:none">
+  <div class="recipe-form-overlay" id="recipe-form-overlay"></div>
+  <div class="recipe-form-panel" id="recipe-form-panel">
+    <div class="recipe-form-handle">
+      <div class="recipe-form-handle-bar"></div>
+    </div>
+    <div class="recipe-form-header">
+      <div class="recipe-form-title-text" id="recipe-form-title">レシピを登録</div>
+      <button class="recipe-form-close-btn" id="btn-recipe-form-close" aria-label="閉じる">✕</button>
+    </div>
+    <div class="recipe-form-body">
+      <div class="form-group">
+        <label for="input-recipe-name">レシピ名</label>
+        <input class="input" type="text" id="input-recipe-name" placeholder="例：ピンク" maxlength="50" inputmode="text">
+      </div>
+      <div class="section-label">材料と比率</div>
+      <div id="ingredients-container"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0">
+        <button class="btn btn-secondary" id="btn-add-ingredient">＋ 材料を追加</button>
+        <button class="btn btn-secondary" id="btn-normalize-ratio">比率を整数に</button>
+        <button class="btn btn-secondary" id="btn-undo-ratio" disabled>元に戻す</button>
+      </div>
+      <button type="button" class="form-details-toggle" id="btn-form-details-toggle">詳細設定 ▼</button>
+      <div class="form-details-body" id="form-details-body">
+        <div class="form-group" style="margin-top:12px">
+          <label for="input-recipe-folder">所属フォルダ</label>
+          <select class="input" id="input-recipe-folder">
+            <option value="">フォルダなし</option>
+          </select>
+        </div>
+        <div id="form-tag-section" style="margin-bottom:16px"></div>
+      </div>
+      <div class="divider"></div>
+      <div id="form-error" class="error-msg"></div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-full" id="btn-save-recipe">保存</button>
+        <button class="btn btn-secondary btn-full" id="btn-cancel-form">キャンセル</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Folder Name Modal -->
+<div class="modal-overlay hidden" id="modal-folder">
+  <div class="modal-card">
+    <div class="modal-title" id="modal-folder-title">フォルダを作成</div>
+    <div class="form-group" style="margin-bottom:0">
+      <label for="input-folder-name">フォルダ名</label>
+      <input class="input" type="text" id="input-folder-name" placeholder="例：お酒用" maxlength="30" inputmode="text">
+    </div>
+    <div id="modal-folder-error" class="error-msg" style="margin-top:10px;margin-bottom:0"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-modal-folder-cancel">キャンセル</button>
+      <button class="btn btn-primary" id="btn-modal-folder-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Move Recipe Modal -->
+<div class="modal-overlay hidden" id="modal-move">
+  <div class="modal-card">
+    <div class="modal-title">フォルダに移動</div>
+    <div class="move-options-list" id="move-options-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-full" id="btn-modal-move-cancel">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tag Modal -->
+<div class="modal-overlay hidden" id="modal-tag">
+  <div class="modal-card" style="max-height:90vh;overflow-y:auto;max-width:400px">
+    <div class="modal-title" id="modal-tag-title">タグを作成</div>
+    <div class="form-group">
+      <label for="input-tag-name">タグ名</label>
+      <input class="input" type="text" id="input-tag-name" placeholder="例：お気に入り" maxlength="20" inputmode="text">
+    </div>
+    <div class="form-group">
+      <label>カラー</label>
+      <div class="tag-color-presets" id="tag-color-presets"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+        <button type="button" id="btn-custom-color" class="btn btn-secondary btn-sm">カスタム</button>
+        <div id="cp-selected-preview" style="width:26px;height:26px;border-radius:5px;border:1px solid #e2e8f0;flex-shrink:0"></div>
+      </div>
+      <input type="hidden" id="input-tag-color" value="">
+      <!-- Canvas color picker (shown when カスタム button is toggled) -->
+      <div id="custom-color-picker" style="display:none;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <div style="position:relative;flex:1;min-width:0">
+            <canvas id="cp-canvas-2d" width="200" height="140"
+              style="width:100%;height:140px;border-radius:8px;cursor:crosshair;touch-action:none;display:block;border:1px solid #e2e8f0"></canvas>
+          </div>
+          <div style="position:relative;width:22px;flex-shrink:0">
+            <canvas id="cp-canvas-bright" width="22" height="140"
+              style="width:22px;height:140px;border-radius:8px;cursor:ns-resize;touch-action:none;display:block;border:1px solid #e2e8f0"></canvas>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+          <div id="cp-preview" style="width:30px;height:30px;border-radius:6px;border:1px solid #e2e8f0;flex-shrink:0"></div>
+          <span id="cp-hex" style="font-size:13px;font-family:monospace;color:#4a5568;letter-spacing:0.5px"></span>
+        </div>
+      </div>
+    </div>
+    <div class="form-group" id="tag-scope-group">
+      <label>表示するフォルダ</label>
+      <label class="tag-scope-option">
+        <input type="radio" name="tag-scope-radio" value="all" id="tag-scope-all" checked>
+        すべてのフォルダで表示
+      </label>
+      <label class="tag-scope-option">
+        <input type="radio" name="tag-scope-radio" value="specific" id="tag-scope-specific">
+        特定のフォルダのみ
+      </label>
+      <div class="tag-scope-folders" id="tag-scope-folders"></div>
+    </div>
+    <div id="modal-tag-error" class="error-msg" style="margin-bottom:0"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-modal-tag-cancel">キャンセル</button>
+      <button class="btn btn-primary" id="btn-modal-tag-save">保存</button>
+    </div>
+    <div id="modal-tag-delete-wrap" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- Bulk Delete Confirm Modal -->
+<div class="modal-overlay hidden" id="modal-bulk-confirm">
+  <div class="modal-card">
+    <div class="modal-title">削除の確認</div>
+    <div id="modal-bulk-confirm-msg" style="font-size:14px;color:#4a5568;line-height:1.5;margin-bottom:0"></div>
+    <div class="modal-actions" style="margin-top:20px">
+      <button class="btn btn-secondary" id="btn-bulk-confirm-cancel">キャンセル</button>
+      <button class="btn btn-danger" id="btn-bulk-confirm-ok">削除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Edit Tag Modal -->
+<div class="modal-overlay hidden" id="modal-bulk-tag">
+  <div class="modal-card">
+    <div class="modal-title">タグを編集</div>
+    <div id="bulk-tag-chips-wrap" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;margin-bottom:4px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-bulk-tag-cancel">キャンセル</button>
+      <button class="btn btn-primary" id="btn-bulk-tag-apply">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Folder Delete Modal -->
+<div class="modal-overlay hidden" id="modal-folder-delete">
+  <div class="modal-card">
+    <div class="modal-title" id="modal-folder-delete-title">フォルダを削除</div>
+    <div id="modal-folder-delete-msg" style="font-size:14px;color:#4a5568;margin-bottom:4px"></div>
+    <div class="modal-actions vertical">
+      <button class="btn btn-danger" id="btn-folder-delete-with-recipes">レシピも一緒に削除</button>
+      <button class="btn btn-secondary" id="btn-folder-delete-move-recipes">レシピを未所属に移動</button>
+      <button class="btn btn-secondary" id="btn-folder-delete-cancel">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic Confirm Modal -->
+<div class="modal-overlay hidden" id="modal-confirm">
+  <div class="modal-card">
+    <div class="modal-title" id="modal-confirm-title">確認</div>
+    <div id="modal-confirm-msg" style="font-size:14px;color:#4a5568;line-height:1.6;margin-bottom:0;white-space:pre-line"></div>
+    <div class="modal-actions" style="margin-top:20px">
+      <button class="btn btn-secondary" id="btn-confirm-cancel">キャンセル</button>
+      <button class="btn btn-danger" id="btn-confirm-ok">実行</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic Alert Modal -->
+<div class="modal-overlay hidden" id="modal-alert">
+  <div class="modal-card">
+    <div class="modal-title" id="modal-alert-title">お知らせ</div>
+    <div id="modal-alert-msg" style="font-size:14px;color:#4a5568;line-height:1.6;margin-bottom:0;white-space:pre-line"></div>
+    <div class="modal-actions" style="margin-top:20px">
+      <button class="btn btn-primary btn-full" id="btn-alert-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ============================================================
+// Constants & Config
+// ============================================================
+const STORAGE_KEYS = {
+  recipes:  'ratioApp_recipes',
+  settings: 'ratioApp_settings',
+  folders:  'ratioApp_folders',
+  tags:     'ratioApp_tags'
+};
+
+const TAG_PRESET_COLORS = [
+  '#e74c3c','#e8601a','#e67e22','#e8a020',
+  '#f1c40f','#c8d400','#7dbb42','#27ae60',
+  '#1abc9c','#00b5c8','#3498db','#2980b9',
+  '#1a6fcc','#5c6bc0','#9b59b6','#8e44ad',
+  '#c2185b','#e91e63','#f06292','#795548',
+  '#9e9e9e','#607d8b','#34495e','#2c3e50'
+];
+
+const SETTINGS_CONFIG = [
+  {
+    category: '計算設定',
+    items: [
+      {
+        key: 'roundingMode',
+        label: '端数処理モード',
+        type: 'radio',
+        options: [
+          { value: 'round',       label: '四捨五入',    desc: '小数第1位を四捨五入して整数で表示します（例：33.5g → 34g）' },
+          { value: 'floor',       label: '切り捨て',    desc: '小数点以下を切り捨てて整数で表示します（例：33.7g → 33g）' },
+          { value: 'ceil',        label: '切り上げ',    desc: '小数点以下を切り上げて整数で表示します（例：33.1g → 34g）' },
+          { value: 'approximate', label: '近似値',      desc: '比率を整数倍して全材料が整数になるよう調整します。入力値に最も近い倍数を選択するため、実際の合計量は入力値と異なる場合があります（例：比率2:3:5の場合、k倍された10:15:25のような整数になります）' },
+          { value: 'none',        label: '端数処理なし', desc: '小数点以下3桁まで表示します。割り切れない場合は末尾に「…」を付けます（例：3.333…g）' }
+        ],
+        default: 'round'
+      }
+    ]
+  },
+  {
+    category: 'タグ管理',
+    items: [
+      {
+        key: '_tagManagement',
+        label: '',
+        type: 'custom',
+        render: (el) => renderTagManagementUI(el)
+      }
+    ]
+  },
+  {
+    category: 'アプリ設定',
+    items: [
+      {
+        key: 'lastRecipe',
+        label: '起動時に最後のレシピを開く',
+        type: 'toggle',
+        default: false,
+        desc: 'ONにすると次回起動時に最後に開いた計算画面が直接表示されます。「← 戻る」で一覧に戻れます。'
+      }
+    ]
+  },
+  {
+    category: 'データ管理',
+    items: [
+      {
+        key: '_exportImport',
+        label: '',
+        type: 'custom',
+        render: (el) => renderExportImportUI(el)
+      }
+    ]
+  }
+];
+
+// ============================================================
+// State
+// ============================================================
+let recipes  = [];
+let folders  = [];
+let tags     = [];
+let settings = {};
+let currentRecipeId   = null;
+let calcRecipeId      = null;
+let currentFolderView = null;
+let isComposing        = false;
+let isSearchComposing  = false;
+let searchQuery        = '';
+
+// Drag & Drop
+let dragSrcId        = null;
+let dragSrcType      = null;
+let touchDragSrcId   = null;
+let touchDragSrcType = null;
+let touchDragCard    = null;
+
+// Folder modal
+let folderModalMode     = 'create';
+let folderModalTargetId = null;
+
+// Ingredient calc sets
+let calcIngredientSets = [];
+
+// Tag state
+let activeTagFilter    = new Set();
+let formSelectedTagIds = [];
+let tagModalMode       = 'create';
+let tagModalTargetId   = null;
+let tagModalCallback   = null;
+let tagModalSelectedColor = TAG_PRESET_COLORS[0];
+let tagBulkDeleteMode  = false;
+const checkedTagIds    = new Set();
+
+// Tag sort mode
+let tagSortMode        = false;
+let tagSortDragSrcId   = null;
+let tagSortDragGroup   = null;
+let tagSortFloatEl     = null;
+let tagSortPlaceholder = null;
+let tagSortSrcChip     = null;
+
+// ============================================================
+// Storage
+// ============================================================
+function loadData() {
+  try {
+    const r = localStorage.getItem(STORAGE_KEYS.recipes);
+    recipes = r ? JSON.parse(r) : [];
+  } catch { recipes = []; }
+
+  try {
+    const f = localStorage.getItem(STORAGE_KEYS.folders);
+    folders = f ? JSON.parse(f) : [];
+  } catch { folders = []; }
+
+  try {
+    const t = localStorage.getItem(STORAGE_KEYS.tags);
+    tags = t ? JSON.parse(t) : [];
+  } catch { tags = []; }
+
+  try {
+    const s = localStorage.getItem(STORAGE_KEYS.settings);
+    settings = s ? JSON.parse(s) : {};
+  } catch { settings = {}; }
+
+  SETTINGS_CONFIG.forEach(cat => cat.items.forEach(item => {
+    if (item.key && item.default !== undefined && settings[item.key] === undefined)
+      settings[item.key] = item.default;
+  }));
+  if (settings.tagSearchMode === undefined) settings.tagSearchMode = 'or';
+
+  // Migrations
+  recipes = recipes.map((recipe, index) => ({
+    ...recipe,
+    order:    recipe.order    !== undefined ? recipe.order    : index,
+    folderId: recipe.folderId !== undefined ? recipe.folderId : null,
+    tagIds:       recipe.tagIds       || [],
+    savedAmounts: recipe.savedAmounts || [],
+    memo:         recipe.memo         || ''
+  }));
+  tags = tags.map((tag, index) => ({
+    ...tag,
+    order: tag.order !== undefined ? tag.order : index
+  }));
+  folders = folders.map((folder, index) => ({
+    ...folder,
+    order: folder.order !== undefined ? folder.order : index
+  }));
+}
+
+function saveRecipes()  { localStorage.setItem(STORAGE_KEYS.recipes,  JSON.stringify(recipes));  }
+function saveFolders()  { localStorage.setItem(STORAGE_KEYS.folders,  JSON.stringify(folders));  }
+function saveSettings() { localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings)); }
+function saveTags()     { localStorage.setItem(STORAGE_KEYS.tags,     JSON.stringify(tags));     }
+
+// ============================================================
+// Navigation
+// ============================================================
+const screens = {
+  list:     document.getElementById('screen-list'),
+  calc:     document.getElementById('screen-calc'),
+  settings: document.getElementById('screen-settings')
+};
+const btnBack           = document.getElementById('btn-back');
+const btnSettingsHeader = document.getElementById('btn-settings');
+
+let historyStack = ['list'];
+
+function showScreen(name, push = true) {
+  const domName = (name === 'folder-view') ? 'list' : name;
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  screens[domName].classList.add('active');
+  if (push && historyStack[historyStack.length - 1] !== name) {
+    historyStack.push(name);
+  }
+  btnBack.style.display = historyStack.length > 1 ? '' : 'none';
+  btnSettingsHeader.style.display = name === 'settings' ? 'none' : '';
+  updateHeaderTitle(name);
+}
+
+function updateHeaderTitle(screenName) {
+  const el = document.getElementById('header-title');
+  if (screenName === 'folder-view' && currentFolderView) {
+    const f = folders.find(f => f.id === currentFolderView);
+    el.textContent = f ? f.name : 'フォルダ';
+  } else {
+    el.textContent = '比率計算アプリ';
+  }
+}
+
+function clearTagSortMode() {
+  if (tagSortMode) {
+    tagSortMode = false;
+    const ov = document.getElementById('tag-sort-overlay');
+    if (ov) ov.remove();
+    const bar = document.getElementById('tag-filter-bar');
+    if (bar) bar.classList.remove('sort-active');
+  }
+}
+
+function goBack() {
+  if (historyStack.length <= 1) return;
+  clearTagSortMode();
+  clearBulkEditState();
+  historyStack.pop();
+  const prev = historyStack[historyStack.length - 1];
+  if (prev === 'list') {
+    currentFolderView = null;
+    activeTagFilter = new Set();
+    searchQuery = '';
+    const si = document.getElementById('recipe-search');
+    if (si) { si.value = ''; document.getElementById('recipe-search-clear').style.display = 'none'; }
+    renderRecipeList();
+  } else if (prev === 'folder-view') {
+    renderRecipeList();
+  } else if (prev === 'settings') {
+    renderSettings();
+  }
+  showScreen(prev, false);
+}
+
+btnBack.addEventListener('click', goBack);
+btnSettingsHeader.addEventListener('click', () => {
+  renderSettings();
+  showScreen('settings');
+});
+
+// ============================================================
+// Toast
+// ============================================================
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ============================================================
+// IME helper
+// ============================================================
+function attachIMEGuard(input, onEnter) {
+  input.addEventListener('compositionstart', () => { isComposing = true; });
+  input.addEventListener('compositionend',   () => { isComposing = false; });
+  if (onEnter) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.isComposing || isComposing)) { e.preventDefault(); return; }
+      if (e.key === 'Enter') onEnter(e);
+    });
+  }
+}
+
+// ============================================================
+// Tag helpers
+// ============================================================
+function getTagsForContext(folderId) {
+  return tags.filter(t =>
+    t.scope === 'all' ||
+    (Array.isArray(t.scope) && folderId && t.scope.includes(folderId))
+  );
+}
+
+function getScopeLabel(scope) {
+  if (scope === 'all') return 'すべて';
+  if (!Array.isArray(scope) || scope.length === 0) return 'スコープなし';
+  const names = scope.map(id => {
+    const f = folders.find(f => f.id === id);
+    return f ? f.name : null;
+  }).filter(Boolean);
+  return names.length > 0 ? names.join(', ') : 'スコープなし';
+}
+
+function getTagById(id) { return tags.find(t => t.id === id); }
+
+function buildTagGroups() {
+  const sortedFolders = [...folders].sort((a, b) => a.order - b.order);
+  const groups = [];
+  sortedFolders.forEach(folder => {
+    const folderTags = tags
+      .filter(t => Array.isArray(t.scope) && t.scope.includes(folder.id))
+      .sort((a, b) => a.order - b.order);
+    if (folderTags.length > 0) groups.push({ label: folder.name, tags: folderTags });
+  });
+  const commonTags = tags
+    .filter(t => t.scope === 'all' || (Array.isArray(t.scope) && t.scope.length === 0))
+    .sort((a, b) => a.order - b.order);
+  if (commonTags.length > 0) groups.push({ label: '共通', tags: commonTags });
+  return groups;
+}
+
+function getFilteredRecipes(list) {
+  if (activeTagFilter.size === 0) return list;
+  const isAnd = (settings.tagSearchMode || 'or') === 'and';
+  if (isAnd) {
+    return list.filter(r => r.tagIds && [...activeTagFilter].every(id => r.tagIds.includes(id)));
+  }
+  return list.filter(r => r.tagIds && r.tagIds.some(id => activeTagFilter.has(id)));
+}
+
+function getSearchedRecipes(list) {
+  if (!searchQuery) return list;
+  const q = searchQuery.toLowerCase();
+  return list.filter(r =>
+    r.name.toLowerCase().includes(q) ||
+    r.ingredients.some(i => i.name.toLowerCase().includes(q))
+  );
+}
+
+// ============================================================
+// Tag Filter Bar (always visible, grouped)
+// ============================================================
+function renderTagFilterBar() {
+  const bar = document.getElementById('tag-filter-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+
+  // Determine content
+  let contextTags = null;
+  let groups = null;
+  if (currentFolderView !== null) {
+    contextTags = getTagsForContext(currentFolderView).sort((a, b) => a.order - b.order);
+    if (contextTags.length === 0) return;
+  } else {
+    if (tags.length === 0) return;
+    groups = buildTagGroups();
+    if (groups.length === 0) return;
+  }
+
+  if (tagSortMode) bar.classList.add('sort-active');
+  else bar.classList.remove('sort-active');
+
+  // Outer wrapper (visual in normal mode, transparent in sort-active via CSS)
+  const outer = document.createElement('div');
+  outer.className = 'tag-filter-outer';
+
+  // Button row: [title (flex:1)] [OR/AND] [並べ替え]
+  const btnRow = document.createElement('div');
+  btnRow.className = 'tag-sort-btn-row';
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'tag-filter-section-title';
+  titleSpan.textContent = 'タグで絞り込み';
+  btnRow.appendChild(titleSpan);
+  if (!tagSortMode) btnRow.appendChild(makeOrAndToggle());
+  const sortBtn = document.createElement('button');
+  sortBtn.className = 'btn-tag-sort' + (tagSortMode ? ' done' : '');
+  sortBtn.textContent = tagSortMode ? '完了' : '並べ替え';
+  sortBtn.addEventListener('click', () => {
+    tagSortMode = !tagSortMode;
+    if (!tagSortMode) {
+      const ov = document.getElementById('tag-sort-overlay');
+      if (ov) ov.remove();
+      bar.classList.remove('sort-active');
+    }
+    renderTagFilterBar();
+    if (!tagSortMode && currentFolderView === null) renderRecipeList();
+  });
+  btnRow.appendChild(sortBtn);
+  outer.appendChild(btnRow);
+
+  if (contextTags !== null) {
+    // ── Folder view: flat chip list ──
+    if (tagSortMode) {
+      const area = document.createElement('div');
+      area.className = 'tag-filter-area';
+      const row = document.createElement('div');
+      row.className = 'tag-filter-row';
+      const folderGroup = { label: '__folder__', tags: contextTags };
+      contextTags.forEach(tag => row.appendChild(makeSortChip(tag, folderGroup)));
+      area.appendChild(row);
+      outer.appendChild(area);
+    } else {
+      const row = document.createElement('div');
+      row.className = 'tag-filter-row';
+      contextTags.forEach(tag => row.appendChild(makeFilterChip(tag)));
+      outer.appendChild(row);
+    }
+  } else {
+    // ── Main list ──
+    if (tagSortMode) {
+      // Sort mode: flat rows with group labels (needed for drag-and-drop)
+      const area = document.createElement('div');
+      area.className = 'tag-filter-area';
+      groups.forEach(group => {
+        const row = document.createElement('div');
+        row.className = 'tag-filter-row';
+        const lbl = document.createElement('span');
+        lbl.className = 'tag-filter-group-label';
+        lbl.textContent = group.label;
+        row.appendChild(lbl);
+        group.tags.forEach(tag => row.appendChild(makeSortChip(tag, group)));
+        area.appendChild(row);
+      });
+      outer.appendChild(area);
+    } else {
+      // Normal mode: folder groups in inner boxes, common tags flat
+      const folderGroups = groups.filter(g => g.label !== '共通');
+      const commonGroup  = groups.find(g => g.label === '共通');
+
+      folderGroups.forEach(group => {
+        const box = document.createElement('div');
+        box.className = 'tag-filter-group-box';
+        const lbl = document.createElement('span');
+        lbl.className = 'tag-filter-box-label';
+        lbl.textContent = group.label;
+        box.appendChild(lbl);
+        const row = document.createElement('div');
+        row.className = 'tag-filter-row';
+        group.tags.forEach(tag => row.appendChild(makeFilterChip(tag)));
+        box.appendChild(row);
+        outer.appendChild(box);
+      });
+
+      if (commonGroup) {
+        const row = document.createElement('div');
+        row.className = 'tag-filter-row';
+        if (folderGroups.length > 0) {
+          const lbl = document.createElement('span');
+          lbl.className = 'tag-filter-group-label';
+          lbl.textContent = '共通';
+          row.appendChild(lbl);
+        }
+        commonGroup.tags.forEach(tag => row.appendChild(makeFilterChip(tag)));
+        outer.appendChild(row);
+      }
+    }
+  }
+
+  bar.appendChild(outer);
+
+  // Sort overlay
+  const existingOv = document.getElementById('tag-sort-overlay');
+  if (tagSortMode && !existingOv) {
+    const overlay = document.createElement('div');
+    overlay.id = 'tag-sort-overlay';
+    document.getElementById('app').appendChild(overlay);
+  } else if (!tagSortMode && existingOv) {
+    existingOv.remove();
+  }
+}
+
+function makeOrAndToggle() {
+  const current = settings.tagSearchMode || 'or';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'tag-search-mode-btn' + (current === 'and' ? ' and-mode' : '');
+  btn.textContent = current === 'and' ? 'AND検索中' : 'OR検索中';
+  btn.addEventListener('click', () => {
+    settings.tagSearchMode = (settings.tagSearchMode || 'or') === 'or' ? 'and' : 'or';
+    saveSettings();
+    renderTagFilterBar();
+    if (activeTagFilter.size > 0) renderRecipeList();
+  });
+  return btn;
+}
+
+function makeFilterChip(tag) {
+  const chip = document.createElement('span');
+  chip.className = 'filter-chip' + (activeTagFilter.has(tag.id) ? ' active' : '');
+  chip.style.background = tag.color;
+  chip.style.color = getTextColor(tag.color);
+  chip.style.border = '1.5px solid ' + getTagBorderColor(tag.color);
+  chip.style.textShadow = getTextShadow(tag.color);
+  chip.textContent = tag.name;
+  chip.addEventListener('click', () => {
+    if (activeTagFilter.has(tag.id)) activeTagFilter.delete(tag.id);
+    else activeTagFilter.add(tag.id);
+    renderTagFilterBar();
+    renderRecipeList();
+  });
+  return chip;
+}
+
+// ============================================================
+// Tag sort chip (home screen drag reorder)
+// ============================================================
+function makeSortChip(tag, group) {
+  const chip = document.createElement('span');
+  chip.className = 'filter-chip sort-draggable';
+  chip.style.background = tag.color;
+  chip.style.color = getTextColor(tag.color);
+  chip.style.border = '1.5px solid ' + getTagBorderColor(tag.color);
+  chip.style.textShadow = getTextShadow(tag.color);
+  chip.style.opacity = '1';
+  chip.textContent = tag.name;
+  chip.dataset.tagId = tag.id;
+  chip.dataset.groupLabel = group.label;
+
+  // Mouse events
+  chip.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startTagSortDrag(chip, tag, group, e.clientX, e.clientY);
+  });
+
+  // Touch events
+  chip.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    startTagSortDrag(chip, tag, group, t.clientX, t.clientY);
+  }, { passive: true });
+
+  return chip;
+}
+
+function startTagSortDrag(chip, tag, group, startX, startY) {
+  tagSortDragSrcId = tag.id;
+  tagSortDragGroup = group.label;
+  tagSortSrcChip = chip;
+
+  const rect = chip.getBoundingClientRect();
+  const offsetX = startX - rect.left;
+  const offsetY = startY - rect.top;
+
+  // Create floating clone
+  const floatEl = document.createElement('span');
+  floatEl.className = 'tag-chip-floating';
+  floatEl.style.background = tag.color;
+  floatEl.style.color = getTextColor(tag.color);
+  floatEl.style.border = '1.5px solid ' + getTagBorderColor(tag.color);
+  floatEl.style.textShadow = getTextShadow(tag.color);
+  floatEl.style.width = rect.width + 'px';
+  floatEl.style.height = rect.height + 'px';
+  floatEl.style.lineHeight = rect.height + 'px';
+  floatEl.textContent = tag.name;
+  floatEl.style.left = (startX - offsetX) + 'px';
+  floatEl.style.top  = (startY - offsetY) + 'px';
+  document.body.appendChild(floatEl);
+  tagSortFloatEl = floatEl;
+
+  // Create placeholder (same size, invisible)
+  const ph = document.createElement('span');
+  ph.className = 'filter-chip filter-chip-placeholder';
+  ph.style.width = rect.width + 'px';
+  ph.style.height = rect.height + 'px';
+  chip.parentNode.insertBefore(ph, chip);
+  tagSortPlaceholder = ph;
+
+  // Hide original
+  chip.style.visibility = 'hidden';
+
+  function onMove(clientX, clientY) {
+    // Clamp float position to .tag-filter-area container bounds
+    const container = document.querySelector('.tag-filter-area');
+    const chipW = rect.width;
+    const chipH = rect.height;
+    let px = clientX - offsetX;
+    let py = clientY - offsetY;
+    if (container) {
+      const cr = container.getBoundingClientRect();
+      px = Math.max(cr.left, Math.min(cr.right  - chipW, px));
+      py = Math.max(cr.top,  Math.min(cr.bottom - chipH, py));
+    }
+    floatEl.style.left = px + 'px';
+    floatEl.style.top  = py + 'px';
+
+    // Use chip center (clamped) for hit-testing
+    const cx = px + chipW / 2;
+    const cy = py + chipH / 2;
+
+    floatEl.style.display = 'none';
+    const el = document.elementFromPoint(cx, cy);
+    floatEl.style.display = '';
+
+    const target = el ? el.closest('.filter-chip.sort-draggable') : null;
+    if (target && target !== chip && target.dataset.groupLabel === group.label) {
+      const targetRect = target.getBoundingClientRect();
+      const insertBefore = cx < targetRect.left + targetRect.width / 2;
+      if (insertBefore) {
+        target.parentNode.insertBefore(ph, target);
+      } else {
+        target.parentNode.insertBefore(ph, target.nextSibling);
+      }
+    }
+  }
+
+  function onMouseMove(e) { onMove(e.clientX, e.clientY); }
+  function onTouchMove(e) {
+    e.preventDefault();
+    const t = e.touches[0];
+    onMove(t.clientX, t.clientY);
+  }
+
+  function finish() {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    document.removeEventListener('touchmove', onTouchMove);
+    document.removeEventListener('touchend', onTouchEnd2);
+    document.removeEventListener('touchcancel', onTouchEnd2);
+
+    floatEl.remove();
+    tagSortFloatEl = null;
+
+    // Build new tag order by reading row children:
+    // row has: label-span | chip | chip | ph | chip | ...
+    // Replace placeholder position with drag src id, skip hidden src chip
+    const row = ph.parentNode;
+    const newOrder = [];
+    [...row.children].forEach(child => {
+      if (child === chip) return; // hidden original, skip
+      if (child === ph) {
+        newOrder.push(tag.id); // insert drag src at placeholder position
+      } else if (child.dataset && child.dataset.tagId) {
+        newOrder.push(child.dataset.tagId);
+      }
+    });
+    if (!newOrder.includes(tag.id)) newOrder.push(tag.id);
+
+    ph.remove();
+    chip.style.visibility = '';
+    tagSortSrcChip = null;
+    tagSortPlaceholder = null;
+
+    // For folder-view, group.label is '__folder__' — use the group directly
+    const currentGroup = group.label === '__folder__'
+      ? group
+      : buildTagGroups().find(g => g.label === group.label);
+    if (!currentGroup) { tagSortDragSrcId = tagSortDragGroup = null; return; }
+
+    reorderTagsInGroupByIds(newOrder, currentGroup);
+    tagSortDragSrcId = tagSortDragGroup = null;
+  }
+
+  function onMouseUp(e)   { finish(e.clientX, e.clientY); }
+  function onTouchEnd2(e) { const t = e.changedTouches[0]; finish(t.clientX, t.clientY); }
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup',   onMouseUp);
+  document.addEventListener('touchmove', onTouchMove, { passive: false });
+  document.addEventListener('touchend',  onTouchEnd2);
+  document.addEventListener('touchcancel', onTouchEnd2);
+}
+
+function reorderTagsInGroupByIds(intendedIds, group) {
+  intendedIds.forEach((id, i) => {
+    const t = tags.find(t => t.id === id);
+    if (t) t.order = i;
+  });
+  saveTags();
+  renderTagFilterBar();
+  showToast('順序を変更しました');
+}
+
+// ============================================================
+// Keyboard / Visual Viewport utilities
+// ============================================================
+
+// Adjust a centered modal-overlay to follow the visual viewport
+// (so it isn't obscured by the software keyboard).
+// Returns a cleanup function to call when closing the modal.
+function attachModalKeyboard(overlayEl, cardEl) {
+  if (!window.visualViewport) return () => {};
+  function update() {
+    const vv = window.visualViewport;
+    overlayEl.style.height = vv.height + 'px';
+    overlayEl.style.top    = vv.offsetTop + 'px';
+    if (cardEl) cardEl.style.maxHeight = Math.floor(vv.height * 0.92) + 'px';
+  }
+  window.visualViewport.addEventListener('resize', update);
+  window.visualViewport.addEventListener('scroll', update);
+  update();
+  return () => {
+    window.visualViewport.removeEventListener('resize', update);
+    window.visualViewport.removeEventListener('scroll', update);
+    overlayEl.style.height    = '';
+    overlayEl.style.top       = '';
+    if (cardEl) cardEl.style.maxHeight = '';
+  };
+}
+
+// Scroll an input/textarea into view after the keyboard animation completes.
+function focusScrollIntoView(el) {
+  setTimeout(() => {
+    if (el && document.activeElement === el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 320);
+}
+
+// ============================================================
+// Long-press utility
+// ============================================================
+function attachLongPress(el, onLongPress, excludeSelector) {
+  let timer = null;
+  let sx = 0, sy = 0;
+  let fired = false;
+  const DELAY = 500;
+  const MOVE_THRESHOLD = 10;
+
+  const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+  const start = (clientX, clientY) => {
+    fired = false;
+    sx = clientX; sy = clientY;
+    timer = setTimeout(() => {
+      timer = null;
+      fired = true;
+      if (navigator.vibrate) navigator.vibrate(30);
+      onLongPress();
+    }, DELAY);
+  };
+
+  el.addEventListener('mousedown', (e) => {
+    if (excludeSelector && e.target.closest(excludeSelector)) return;
+    start(e.clientX, e.clientY);
+  });
+  el.addEventListener('mousemove', (e) => {
+    if (!timer) return;
+    if (Math.abs(e.clientX - sx) > MOVE_THRESHOLD || Math.abs(e.clientY - sy) > MOVE_THRESHOLD) clear();
+  });
+  el.addEventListener('mouseup',   clear);
+  el.addEventListener('mouseleave', clear);
+  el.addEventListener('click', (e) => {
+    if (fired) { e.stopPropagation(); fired = false; }
+  }, true); // capture to block post-longpress click
+
+  el.addEventListener('touchstart', (e) => {
+    if (excludeSelector && e.target.closest(excludeSelector)) return;
+    const t = e.touches[0];
+    start(t.clientX, t.clientY);
+  }, { passive: true });
+  el.addEventListener('touchmove', (e) => {
+    if (!timer) return;
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - sx) > MOVE_THRESHOLD || Math.abs(t.clientY - sy) > MOVE_THRESHOLD) clear();
+  }, { passive: true });
+  el.addEventListener('touchend',   clear);
+  el.addEventListener('touchcancel', clear);
+}
+
+// ============================================================
+// Bulk Edit
+// ============================================================
+let bulkEditMode = false;
+const checkedRecipeIds = new Set();
+const checkedFolderIds = new Set();
+let _bulkTagInitialOn = new Set();  // tags that ALL selected recipes had when dialog opened
+let _bulkTagCurrentOn = new Set();  // current ON/OFF state (user-modified)
+
+function clearBulkEditState() {
+  if (!bulkEditMode) return;
+  bulkEditMode = false;
+  checkedRecipeIds.clear();
+  checkedFolderIds.clear();
+  document.getElementById('bulk-action-bar').classList.remove('visible');
+  document.getElementById('screen-list').classList.remove('bulk-bar-open');
+}
+
+function exitBulkEditMode() {
+  clearBulkEditState();
+  renderRecipeList();
+}
+
+function renderBulkToolbar() {
+  const bar = document.getElementById('bulk-toolbar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  if (searchQuery) return;
+
+  if (!bulkEditMode) {
+    const hint = document.createElement('span');
+    hint.className = 'bulk-hint-text';
+    hint.textContent = '長押しで一括編集';
+    bar.appendChild(hint);
+    return;
+  }
+
+  // Bulk mode: 全選択/全解除 | count | 完了
+  const row = document.createElement('div');
+  row.className = 'bulk-control-row';
+
+  const selAllBtn = document.createElement('button');
+  selAllBtn.className = 'btn-bulk-select-all';
+  selAllBtn.textContent = areAllChecked() ? '全解除' : '全選択';
+  selAllBtn.addEventListener('click', () => {
+    if (areAllChecked()) { checkedRecipeIds.clear(); checkedFolderIds.clear(); }
+    else selectAllVisible();
+    document.querySelectorAll('.recipe-card').forEach(card => {
+      const cb = card.querySelector('input[type="checkbox"]');
+      if (!cb) return;
+      cb.checked = checkedRecipeIds.has(card.dataset.id);
+      card.classList.toggle('bulk-checked', cb.checked);
+    });
+    document.querySelectorAll('.folder-card').forEach(card => {
+      const cb = card.querySelector('input[type="checkbox"]');
+      if (!cb) return;
+      cb.checked = checkedFolderIds.has(card.dataset.folderId);
+      card.classList.toggle('bulk-checked', cb.checked);
+    });
+    updateBulkActionBar();
+  });
+  row.appendChild(selAllBtn);
+
+  const total = checkedRecipeIds.size + checkedFolderIds.size;
+  const countLbl = document.createElement('span');
+  countLbl.className = 'bulk-count-label';
+  countLbl.textContent = total > 0 ? `${total}件選択中` : '';
+  row.appendChild(countLbl);
+
+  const doneBtn = document.createElement('button');
+  doneBtn.className = 'btn-bulk-toggle done';
+  doneBtn.textContent = '完了';
+  doneBtn.addEventListener('click', exitBulkEditMode);
+  row.appendChild(doneBtn);
+
+  bar.appendChild(row);
+}
+
+function areAllChecked() {
+  if (currentFolderView !== null) {
+    const ids = recipes.filter(r => r.folderId === currentFolderView).map(r => r.id);
+    return ids.length > 0 && ids.every(id => checkedRecipeIds.has(id));
+  }
+  if (activeTagFilter.size > 0) {
+    const ids = getFilteredRecipes([...recipes]).map(r => r.id);
+    return ids.length > 0 && ids.every(id => checkedRecipeIds.has(id));
+  }
+  const unassignedIds = recipes.filter(r => !r.folderId).map(r => r.id);
+  const folderIds     = folders.map(f => f.id);
+  const total = unassignedIds.length + folderIds.length;
+  return total > 0 &&
+    unassignedIds.every(id => checkedRecipeIds.has(id)) &&
+    folderIds.every(id => checkedFolderIds.has(id));
+}
+
+function selectAllVisible() {
+  if (currentFolderView !== null) {
+    recipes.filter(r => r.folderId === currentFolderView).forEach(r => checkedRecipeIds.add(r.id));
+  } else if (activeTagFilter.size > 0) {
+    getFilteredRecipes([...recipes]).forEach(r => checkedRecipeIds.add(r.id));
+  } else {
+    recipes.filter(r => !r.folderId).forEach(r => checkedRecipeIds.add(r.id));
+    folders.forEach(f => checkedFolderIds.add(f.id));
+  }
+}
+
+function updateBulkActionBar() {
+  const bar    = document.getElementById('bulk-action-bar');
+  const screen = document.getElementById('screen-list');
+  const total  = checkedRecipeIds.size + checkedFolderIds.size;
+
+  if (total === 0) {
+    bar.classList.remove('visible');
+    screen.classList.remove('bulk-bar-open');
+  } else {
+    bar.classList.add('visible');
+    screen.classList.add('bulk-bar-open');
+  }
+
+  const isInFolder = currentFolderView !== null;
+  const hasR = checkedRecipeIds.size > 0;
+  const hasF = checkedFolderIds.size > 0;
+
+  document.getElementById('btn-bulk-delete').style.display = '';
+  if (isInFolder) {
+    document.getElementById('btn-bulk-move').style.display    = '';
+    document.getElementById('btn-bulk-add-tag').style.display = '';
+  } else {
+    document.getElementById('btn-bulk-add-tag').style.display = 'none';
+    document.getElementById('btn-bulk-move').style.display    = (hasR && !hasF) ? '' : 'none';
+  }
+
+  renderBulkToolbar(); // refresh count and select-all text in toolbar
+}
+
+// Bulk delete
+document.getElementById('btn-bulk-delete').addEventListener('click', () => {
+  const rCount = checkedRecipeIds.size;
+  const fCount = checkedFolderIds.size;
+
+  if (fCount > 0 && rCount === 0) {
+    const names = [...checkedFolderIds].map(id => folders.find(f => f.id === id)?.name).filter(Boolean);
+    const title = fCount === 1 ? `「${names[0]}」を削除` : `${fCount}件のフォルダを削除`;
+    document.getElementById('modal-folder-delete-title').textContent = title;
+    document.getElementById('modal-folder-delete-msg').textContent = 'フォルダ内のレシピをどうしますか？';
+    _folderDeleteTargetId = '__bulk__';
+    document.getElementById('modal-folder-delete').classList.remove('hidden');
+
+  } else if (rCount > 0 && fCount === 0) {
+    document.getElementById('modal-bulk-confirm-msg').textContent =
+      `選択した${rCount}件のレシピを削除しますか？`;
+    document.getElementById('btn-bulk-confirm-ok').onclick = () => {
+      hideBulkConfirmModal();
+      recipes = recipes.filter(r => !checkedRecipeIds.has(r.id));
+      saveRecipes();
+      exitBulkEditMode();
+      showToast(`${rCount}件のレシピを削除しました`);
+    };
+    document.getElementById('modal-bulk-confirm').classList.remove('hidden');
+
+  } else {
+    document.getElementById('modal-bulk-confirm-msg').textContent =
+      '選択したフォルダとレシピを削除しますか？フォルダ内のレシピも全て削除されます。';
+    document.getElementById('btn-bulk-confirm-ok').onclick = () => {
+      hideBulkConfirmModal();
+      const folderRecipeIds = new Set();
+      checkedFolderIds.forEach(fid => recipes.filter(r => r.folderId === fid).forEach(r => folderRecipeIds.add(r.id)));
+      recipes = recipes.filter(r => !checkedRecipeIds.has(r.id) && !folderRecipeIds.has(r.id));
+      const toDelF = new Set(checkedFolderIds);
+      folders = folders.filter(f => !toDelF.has(f.id));
+      tags.forEach(t => {
+        if (Array.isArray(t.scope)) {
+          t.scope = t.scope.filter(id => !toDelF.has(id));
+          if (t.scope.length === 0) t.scope = 'all';
+        }
+      });
+      saveRecipes(); saveFolders(); saveTags();
+      exitBulkEditMode();
+      showToast('削除しました');
+    };
+    document.getElementById('modal-bulk-confirm').classList.remove('hidden');
+  }
+});
+
+function hideBulkConfirmModal() {
+  document.getElementById('modal-bulk-confirm').classList.add('hidden');
+}
+document.getElementById('btn-bulk-confirm-cancel').addEventListener('click', hideBulkConfirmModal);
+document.getElementById('modal-bulk-confirm').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-bulk-confirm')) hideBulkConfirmModal();
+});
+
+// Bulk move to folder
+document.getElementById('btn-bulk-move').addEventListener('click', () => {
+  const listEl = document.getElementById('move-options-list');
+  listEl.innerHTML = '';
+  const excludeId = currentFolderView;
+
+  const noOpt = document.createElement('div');
+  noOpt.className = 'move-option';
+  noOpt.innerHTML = '<span class="move-option-icon">📋</span>フォルダなし';
+  noOpt.addEventListener('click', () => { doBulkMove(null); hideMoveDialog(); });
+  listEl.appendChild(noOpt);
+
+  [...folders].sort((a, b) => a.order - b.order)
+    .filter(f => f.id !== excludeId)
+    .forEach(folder => {
+      const opt = document.createElement('div');
+      opt.className = 'move-option';
+      opt.innerHTML = `<span class="move-option-icon">📁</span>${escHtml(folder.name)}`;
+      opt.addEventListener('click', () => { doBulkMove(folder.id); hideMoveDialog(); });
+      listEl.appendChild(opt);
+    });
+
+  document.getElementById('modal-move').classList.remove('hidden');
+});
+
+function doBulkMove(folderId) {
+  checkedRecipeIds.forEach(id => {
+    const r = recipes.find(r => r.id === id);
+    if (r) r.folderId = folderId;
+  });
+  saveRecipes();
+  const label = folderId ? (folders.find(f => f.id === folderId)?.name || 'フォルダ') : 'フォルダなし';
+  exitBulkEditMode();
+  showToast(`「${label}」に移動しました`);
+}
+
+// Bulk edit tags
+function renderBulkTagChips() {
+  const wrap = document.getElementById('bulk-tag-chips-wrap');
+  wrap.innerHTML = '';
+
+  const contextTags = getTagsForContext(currentFolderView).sort((a, b) => a.order - b.order);
+
+  if (contextTags.length === 0) {
+    const msg = document.createElement('span');
+    msg.style.cssText = 'font-size:14px;color:#718096';
+    msg.textContent = '使用可能なタグがありません';
+    wrap.appendChild(msg);
+  } else {
+    contextTags.forEach(tag => {
+      const isOn = _bulkTagCurrentOn.has(tag.id);
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip-sm';
+      chip.style.cssText = `background:${tag.color};color:${getTextColor(tag.color)};cursor:pointer;padding:5px 12px;font-size:13px;` +
+        `border:1.5px solid ${getTagBorderColor(tag.color)};text-shadow:${getTextShadow(tag.color)};outline-offset:2px;transition:opacity 0.12s,outline 0.12s;` +
+        (isOn ? 'opacity:1;outline:2px solid rgba(0,0,0,0.35);' : 'opacity:0.4;');
+      chip.textContent = (isOn ? '✓ ' : '') + tag.name;
+      chip.addEventListener('click', () => {
+        if (_bulkTagCurrentOn.has(tag.id)) _bulkTagCurrentOn.delete(tag.id);
+        else                               _bulkTagCurrentOn.add(tag.id);
+        renderBulkTagChips();
+      });
+      wrap.appendChild(chip);
+    });
+  }
+
+  // "＋ 新しいタグ" button
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'tag-chip-add';
+  addBtn.textContent = '＋ 新しいタグ';
+  addBtn.addEventListener('click', () => {
+    const bulkModal = document.getElementById('modal-bulk-tag');
+    bulkModal.classList.add('hidden');
+
+    let restored = false;
+    const restore = () => {
+      if (restored) return;
+      restored = true;
+      renderBulkTagChips();
+      bulkModal.classList.remove('hidden');
+    };
+
+    const cancelBtn = document.getElementById('btn-modal-tag-cancel');
+    const tagModal  = document.getElementById('modal-tag');
+    cancelBtn.addEventListener('click', restore, { once: true });
+    const ovHandler = (e) => {
+      if (e.target === tagModal) { restore(); tagModal.removeEventListener('click', ovHandler); }
+    };
+    tagModal.addEventListener('click', ovHandler);
+
+    showTagModal('create', null, () => {
+      cancelBtn.removeEventListener('click', restore);
+      tagModal.removeEventListener('click', ovHandler);
+      const newTag = tags[tags.length - 1];
+      if (newTag) _bulkTagCurrentOn.add(newTag.id);
+      restore();
+    });
+  });
+  wrap.appendChild(addBtn);
+}
+
+document.getElementById('btn-bulk-add-tag').addEventListener('click', () => {
+  _bulkTagInitialOn.clear();
+  _bulkTagCurrentOn.clear();
+
+  // Compute initial ON: tags that ALL selected recipes have
+  const selectedRecipes = [...checkedRecipeIds]
+    .map(id => recipes.find(r => r.id === id)).filter(Boolean);
+  const contextTags = getTagsForContext(currentFolderView);
+  contextTags.forEach(tag => {
+    if (selectedRecipes.length > 0 &&
+        selectedRecipes.every(r => (r.tagIds || []).includes(tag.id))) {
+      _bulkTagInitialOn.add(tag.id);
+      _bulkTagCurrentOn.add(tag.id);
+    }
+  });
+
+  renderBulkTagChips();
+  document.getElementById('modal-bulk-tag').classList.remove('hidden');
+});
+
+document.getElementById('btn-bulk-tag-cancel').addEventListener('click', () => {
+  document.getElementById('modal-bulk-tag').classList.add('hidden');
+});
+document.getElementById('modal-bulk-tag').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-bulk-tag'))
+    document.getElementById('modal-bulk-tag').classList.add('hidden');
+});
+document.getElementById('btn-bulk-tag-apply').addEventListener('click', () => {
+  document.getElementById('modal-bulk-tag').classList.add('hidden');
+  const recipeCount = checkedRecipeIds.size;
+
+  // Apply diff: ON→unchanged stays, OFF→ON adds, ON→OFF removes
+  checkedRecipeIds.forEach(id => {
+    const r = recipes.find(r => r.id === id);
+    if (!r) return;
+    if (!r.tagIds) r.tagIds = [];
+    // Tags turned ON (that weren't initially ON): add
+    _bulkTagCurrentOn.forEach(tagId => {
+      if (!r.tagIds.includes(tagId)) r.tagIds.push(tagId);
+    });
+    // Tags turned OFF (that were initially ON): remove
+    _bulkTagInitialOn.forEach(tagId => {
+      if (!_bulkTagCurrentOn.has(tagId)) {
+        r.tagIds = r.tagIds.filter(id2 => id2 !== tagId);
+      }
+    });
+  });
+
+  saveRecipes();
+  exitBulkEditMode();
+  showToast(`${recipeCount}件のレシピのタグを更新しました`);
+});
+
+// ============================================================
+// Screen 1: Recipe List
+// ============================================================
+function renderRecipeList() {
+  renderTagFilterBar();
+  renderBulkToolbar();
+
+  const container = document.getElementById('recipe-list-container');
+  container.innerHTML = '';
+  if (bulkEditMode) container.classList.add('bulk-edit-active');
+  else              container.classList.remove('bulk-edit-active');
+
+  const titleEl = document.getElementById('list-screen-title');
+  const folderBtn = document.getElementById('btn-new-folder');
+
+  // === Search mode: flat list across all recipes ===
+  if (searchQuery) {
+    titleEl.textContent = 'レシピ一覧';
+    folderBtn.style.display = '';
+    let results = getSearchedRecipes([...recipes].sort((a, b) => a.order - b.order));
+    results = getFilteredRecipes(results);
+    if (results.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.innerHTML = '<div class="empty-icon">🔍</div><p>該当するレシピがありません。</p>';
+      container.appendChild(empty);
+    } else {
+      const countEl = document.createElement('div');
+      countEl.style.cssText = 'font-size:13px;color:#718096;margin-bottom:8px';
+      countEl.textContent = `${results.length}件`;
+      container.appendChild(countEl);
+      renderRecipeCards(container, results);
+    }
+    return;
+  }
+
+  if (currentFolderView !== null) {
+    // === Folder contents view ===
+    const folder = folders.find(f => f.id === currentFolderView);
+    titleEl.textContent = folder ? folder.name : 'フォルダ';
+    folderBtn.style.display = 'none';
+
+    let folderRecipes = recipes
+      .filter(r => r.folderId === currentFolderView)
+      .sort((a, b) => a.order - b.order);
+
+    folderRecipes = getFilteredRecipes(folderRecipes);
+
+    if (folderRecipes.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      if (activeTagFilter.size > 0) {
+        empty.innerHTML = '<div class="empty-icon">🏷</div><p>絞り込み条件に一致するレシピがありません。</p>';
+      } else {
+        empty.innerHTML = '<div class="empty-icon">📂</div><p>このフォルダにはまだレシピがありません。<br>「📁 移動」でレシピを追加できます。</p>';
+      }
+      container.appendChild(empty);
+    } else {
+      if (activeTagFilter.size > 0) {
+        const countEl = document.createElement('div');
+        countEl.style.cssText = 'font-size:13px;color:#718096;margin-bottom:8px';
+        countEl.textContent = `${folderRecipes.length}件`;
+        container.appendChild(countEl);
+      }
+      renderRecipeCards(container, folderRecipes);
+    }
+    return;
+  }
+
+  // === Main list view ===
+  titleEl.textContent = 'レシピ一覧';
+  folderBtn.style.display = '';
+
+  const hasFolders   = folders.length > 0;
+  const totalRecipes = recipes.length;
+
+  // Tag filter active: show flat list across all folders
+  if (activeTagFilter.size > 0) {
+    const filtered = getFilteredRecipes([...recipes].sort((a, b) => a.order - b.order));
+    if (filtered.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.innerHTML = '<div class="empty-icon">🏷</div><p>該当するレシピがありません。</p>';
+      container.appendChild(empty);
+    } else {
+      const countEl = document.createElement('div');
+      countEl.style.cssText = 'font-size:13px;color:#718096;margin-bottom:8px';
+      countEl.textContent = `${filtered.length}件`;
+      container.appendChild(countEl);
+      renderRecipeCards(container, filtered);
+    }
+    return;
+  }
+
+  // Wrap main list content in outer frame
+  const listOuter = document.createElement('div');
+  listOuter.className = 'recipe-list-outer';
+
+  if (!hasFolders && totalRecipes === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.innerHTML = '<div class="empty-icon">📋</div><p>まだレシピがありません。<br>新規登録してみましょう！</p>';
+    listOuter.appendChild(empty);
+  } else if (hasFolders) {
+    renderFolderCards(listOuter);
+
+    const unassigned = recipes.filter(r => !r.folderId).sort((a, b) => a.order - b.order);
+    if (unassigned.length > 0) {
+      const div = document.createElement('div');
+      div.className = 'list-section-divider';
+      div.innerHTML = '<span class="list-section-label">フォルダなし</span>';
+      listOuter.appendChild(div);
+      renderRecipeCards(listOuter, unassigned);
+    }
+  } else {
+    renderRecipeCards(listOuter, [...recipes].sort((a, b) => a.order - b.order));
+  }
+
+  container.appendChild(listOuter);
+}
+
+// ============================================================
+// Recipe bottom sheet menu
+// ============================================================
+let _sheetWrapper = null;
+
+function openRecipeSheet(recipeId) {
+  const recipe = recipes.find(r => r.id === recipeId);
+  if (!recipe) return;
+
+  // Remove any existing sheet
+  closeRecipeSheet(true);
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'sheet-wrapper';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'sheet-overlay';
+  overlay.addEventListener('click', () => closeRecipeSheet());
+
+  const panel = document.createElement('div');
+  panel.className = 'sheet-panel';
+
+  const handleBar = document.createElement('div');
+  handleBar.className = 'sheet-handle-bar';
+
+  const nameLine = document.createElement('div');
+  nameLine.className = 'sheet-recipe-name';
+  nameLine.textContent = recipe.name;
+
+  const items = [
+    { icon: '✏️', label: '編集',         action: () => { closeRecipeSheet(true); openFormScreen(recipeId); } },
+    { icon: '📁', label: 'フォルダ移動', action: () => { closeRecipeSheet(true); showMoveDialog(recipeId); } },
+    { icon: '📋', label: '複製',         action: () => { closeRecipeSheet(true); duplicateRecipe(recipeId); } },
+    { icon: '🗑', label: '削除',         danger: true, action: () => {
+      closeRecipeSheet(true);
+      showConfirm(`「${recipe.name}」を削除しますか？`, '削除の確認', '削除').then(ok => {
+        if (!ok) return;
+        recipes = recipes.filter(r => r.id !== recipeId);
+        [...recipes].sort((a, b) => a.order - b.order).forEach((r, i) => { r.order = i; });
+        saveRecipes();
+        renderRecipeList();
+        showToast('レシピを削除しました');
+      });
+    }}
+  ];
+
+  panel.appendChild(handleBar);
+  panel.appendChild(nameLine);
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'sheet-item' + (item.danger ? ' danger' : '');
+    el.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`;
+    el.addEventListener('click', item.action);
+    panel.appendChild(el);
+  });
+
+  wrapper.appendChild(overlay);
+  wrapper.appendChild(panel);
+  document.body.appendChild(wrapper);
+  _sheetWrapper = wrapper;
+
+  // Animate in
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    panel.classList.add('visible');
+  });
+}
+
+function closeRecipeSheet(instant = false) {
+  const wrapper = _sheetWrapper;
+  if (!wrapper) return;
+  _sheetWrapper = null;
+  if (instant) {
+    wrapper.remove();
+    return;
+  }
+  const overlay = wrapper.querySelector('.sheet-overlay');
+  const panel   = wrapper.querySelector('.sheet-panel');
+  if (overlay) overlay.classList.remove('visible');
+  if (panel)   panel.style.transition = 'transform 0.15s ease-in';
+  if (panel)   panel.classList.remove('visible');
+  setTimeout(() => wrapper.remove(), 160);
+}
+
+// ============================================================
+// Duplicate recipe
+// ============================================================
+function duplicateRecipe(recipeId) {
+  const src = recipes.find(r => r.id === recipeId);
+  if (!src) return;
+  const maxOrder = recipes.length > 0 ? Math.max(...recipes.map(r => r.order ?? 0)) : -1;
+  const newRecipe = {
+    ...src,
+    id:           genId(),
+    name:         src.name + 'のコピー',
+    order:        maxOrder + 1,
+    ingredients:  src.ingredients.map(i => ({ ...i })),
+    tagIds:       [...(src.tagIds || [])],
+    savedAmounts: [],
+    memo:         ''
+  };
+  recipes.push(newRecipe);
+  saveRecipes();
+  renderRecipeList();
+  showToast('レシピを複製しました');
+
+  // Highlight new card
+  requestAnimationFrame(() => {
+    const card = document.querySelector(`.recipe-card[data-id="${newRecipe.id}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    requestAnimationFrame(() => {
+      card.classList.add('highlight-new');
+      card.addEventListener('animationend', () => card.classList.remove('highlight-new'), { once: true });
+    });
+  });
+}
+
+// ============================================================
+// Folder bottom sheet menu
+// ============================================================
+let _folderSheetWrapper = null;
+
+function openFolderSheet(folderId) {
+  const folder = folders.find(f => f.id === folderId);
+  if (!folder) return;
+
+  closeFolderSheet(true);
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'sheet-wrapper';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'sheet-overlay';
+  overlay.addEventListener('click', () => closeFolderSheet());
+
+  const panel = document.createElement('div');
+  panel.className = 'sheet-panel';
+
+  const handleBar = document.createElement('div');
+  handleBar.className = 'sheet-handle-bar';
+
+  const nameLine = document.createElement('div');
+  nameLine.className = 'sheet-recipe-name';
+  nameLine.textContent = folder.name;
+
+  const items = [
+    { icon: '✏️', label: '名前を変更',   action: () => { closeFolderSheet(true); showFolderModal('rename', folderId); } },
+    { icon: '📋', label: 'フォルダを複製', action: () => { closeFolderSheet(true); duplicateFolder(folderId); } },
+    { icon: '🗑', label: '削除',          danger: true, action: () => { closeFolderSheet(true); showFolderDeleteModal(folderId); } }
+  ];
+
+  panel.appendChild(handleBar);
+  panel.appendChild(nameLine);
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'sheet-item' + (item.danger ? ' danger' : '');
+    el.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`;
+    el.addEventListener('click', item.action);
+    panel.appendChild(el);
+  });
+
+  wrapper.appendChild(overlay);
+  wrapper.appendChild(panel);
+  document.body.appendChild(wrapper);
+  _folderSheetWrapper = wrapper;
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    panel.classList.add('visible');
+  });
+}
+
+function closeFolderSheet(instant = false) {
+  const wrapper = _folderSheetWrapper;
+  if (!wrapper) return;
+  _folderSheetWrapper = null;
+  if (instant) { wrapper.remove(); return; }
+  const overlay = wrapper.querySelector('.sheet-overlay');
+  const panel   = wrapper.querySelector('.sheet-panel');
+  if (overlay) overlay.classList.remove('visible');
+  if (panel)   panel.style.transition = 'transform 0.15s ease-in';
+  if (panel)   panel.classList.remove('visible');
+  setTimeout(() => wrapper.remove(), 160);
+}
+
+// ============================================================
+// Duplicate folder
+// ============================================================
+function duplicateFolder(folderId) {
+  const src = folders.find(f => f.id === folderId);
+  if (!src) return;
+  const maxFolderOrder = folders.length > 0 ? Math.max(...folders.map(f => f.order ?? 0)) : -1;
+  const newFolderId = 'folder_' + genId();
+  const newFolder = {
+    ...src,
+    id:        newFolderId,
+    name:      src.name + 'のコピー',
+    order:     maxFolderOrder + 1,
+    createdAt: new Date().toISOString()
+  };
+  folders.push(newFolder);
+
+  // SPEC-004: Copy all recipes in the folder to the new folder
+  const srcRecipes = recipes.filter(r => r.folderId === folderId);
+  if (srcRecipes.length > 0) {
+    const maxRecipeOrder = recipes.length > 0 ? Math.max(...recipes.map(r => r.order ?? 0)) : -1;
+    srcRecipes.forEach((r, i) => {
+      recipes.push({
+        ...r,
+        id:           genId(),
+        folderId:     newFolderId,
+        order:        maxRecipeOrder + 1 + i,
+        ingredients:  r.ingredients.map(ing => ({ ...ing })),
+        tagIds:       [...(r.tagIds || [])],
+        savedAmounts: [],
+        memo:         ''
+      });
+    });
+    saveRecipes();
+  }
+
+  saveFolders();
+  renderRecipeList();
+  const recipeNote = srcRecipes.length > 0 ? `（レシピ${srcRecipes.length}件を複製）` : '';
+  showToast(`フォルダを複製しました${recipeNote}`);
+
+  requestAnimationFrame(() => {
+    const card = document.querySelector(`.folder-card[data-folder-id="${newFolderId}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    requestAnimationFrame(() => {
+      card.classList.add('highlight-new');
+      card.addEventListener('animationend', () => card.classList.remove('highlight-new'), { once: true });
+    });
+  });
+}
+
+// ============================================================
+// Folder delete modal (3-choice)
+// ============================================================
+let _folderDeleteTargetId = null;
+
+function showFolderDeleteModal(folderId) {
+  const folder = folders.find(f => f.id === folderId);
+  if (!folder) return;
+  _folderDeleteTargetId = folderId;
+  const count = recipes.filter(r => r.folderId === folderId).length;
+  document.getElementById('modal-folder-delete-title').textContent = `「${folder.name}」を削除`;
+  document.getElementById('modal-folder-delete-msg').textContent =
+    count > 0 ? `このフォルダには${count}件のレシピがあります。` : '';
+  document.getElementById('modal-folder-delete').classList.remove('hidden');
+}
+
+function hideFolderDeleteModal() {
+  document.getElementById('modal-folder-delete').classList.add('hidden');
+  _folderDeleteTargetId = null;
+}
+
+function doFolderDelete(deleteRecipes) {
+  const folderId = _folderDeleteTargetId;
+  hideFolderDeleteModal();
+  if (!folderId) return;
+
+  if (folderId === '__bulk__') {
+    // Bulk folder delete
+    const toDeleteIds = new Set(checkedFolderIds);
+    if (deleteRecipes) {
+      const recipeIdsToDelete = new Set();
+      toDeleteIds.forEach(fid => recipes.filter(r => r.folderId === fid).forEach(r => recipeIdsToDelete.add(r.id)));
+      recipes = recipes.filter(r => !recipeIdsToDelete.has(r.id));
+    } else {
+      recipes.forEach(r => { if (toDeleteIds.has(r.folderId)) r.folderId = null; });
+    }
+    folders = folders.filter(f => !toDeleteIds.has(f.id));
+    tags.forEach(t => {
+      if (Array.isArray(t.scope)) {
+        t.scope = t.scope.filter(id => !toDeleteIds.has(id));
+        if (t.scope.length === 0) t.scope = 'all';
+      }
+    });
+    saveRecipes(); saveFolders(); saveTags();
+    exitBulkEditMode();
+    showToast('フォルダを削除しました');
+    return;
+  }
+
+  if (deleteRecipes) {
+    recipes = recipes.filter(r => r.folderId !== folderId);
+  } else {
+    recipes.forEach(r => { if (r.folderId === folderId) r.folderId = null; });
+  }
+  folders = folders.filter(f => f.id !== folderId);
+  tags.forEach(t => {
+    if (Array.isArray(t.scope)) {
+      t.scope = t.scope.filter(id => id !== folderId);
+      if (t.scope.length === 0) t.scope = 'all';
+    }
+  });
+  saveRecipes(); saveFolders(); saveTags();
+  renderRecipeList();
+  showToast('フォルダを削除しました');
+}
+
+document.getElementById('btn-folder-delete-with-recipes').addEventListener('click', () => doFolderDelete(true));
+document.getElementById('btn-folder-delete-move-recipes').addEventListener('click', () => doFolderDelete(false));
+document.getElementById('btn-folder-delete-cancel').addEventListener('click', hideFolderDeleteModal);
+document.getElementById('modal-folder-delete').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-folder-delete')) hideFolderDeleteModal();
+});
+
+// ============================================================
+// Render folder cards
+// ============================================================
+function renderFolderCards(container) {
+  const sortedFolders = [...folders].sort((a, b) => a.order - b.order);
+  const grid = document.createElement('div');
+  grid.className = 'folder-grid';
+
+  sortedFolders.forEach(folder => {
+    const count = recipes.filter(r => r.folderId === folder.id).length;
+    const card = document.createElement('div');
+    card.className = 'folder-card';
+    card.dataset.folderId = folder.id;
+    card.innerHTML = `
+      <div class="drag-handle" aria-label="並べ替え" title="ドラッグして並べ替え">≡</div>
+      <div class="folder-icon">📁</div>
+      <div class="folder-info">
+        <div class="folder-name">${escHtml(folder.name)}</div>
+        <div class="folder-count">${count}件のレシピ</div>
+      </div>
+      <div class="folder-actions">
+        <button class="btn-recipe-menu" data-folder-id="${folder.id}" aria-label="メニュー">⋮</button>
+      </div>`;
+
+    card.querySelector('.folder-icon').addEventListener('click', () => { if (!bulkEditMode) openFolderView(folder.id); });
+    card.querySelector('.folder-info').addEventListener('click', () => { if (!bulkEditMode) openFolderView(folder.id); });
+
+    const menuBtn = card.querySelector('.btn-recipe-menu');
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!bulkEditMode) openFolderSheet(folder.id);
+    });
+
+    // Bulk edit checkbox
+    if (bulkEditMode) {
+      const cbWrap = document.createElement('div');
+      cbWrap.className = 'bulk-checkbox-wrap';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = checkedFolderIds.has(folder.id);
+      cbWrap.appendChild(cb);
+      card.insertBefore(cbWrap, card.firstChild);
+      card.classList.toggle('bulk-checked', checkedFolderIds.has(folder.id));
+      const toggleFolderCheck = () => {
+        cb.checked = !cb.checked;
+        if (cb.checked) checkedFolderIds.add(folder.id);
+        else            checkedFolderIds.delete(folder.id);
+        card.classList.toggle('bulk-checked', cb.checked);
+        updateBulkActionBar();
+      };
+      cbWrap.addEventListener('click', (e) => { e.stopPropagation(); toggleFolderCheck(); });
+      card.addEventListener('click', (e) => { if (!cbWrap.contains(e.target)) toggleFolderCheck(); });
+    } else {
+      attachLongPress(card, () => {
+        bulkEditMode = true;
+        checkedRecipeIds.clear(); checkedFolderIds.clear();
+        checkedFolderIds.add(folder.id);
+        renderRecipeList();
+      }, '.drag-handle, .btn-folder-menu');
+    }
+
+    const handle = card.querySelector('.drag-handle');
+    if (!bulkEditMode) {
+      handle.setAttribute('draggable', 'true');
+      handle.addEventListener('dragstart', (e) => {
+        dragSrcId   = folder.id;
+        dragSrcType = 'folder';
+        e.dataTransfer.setData('text/plain', folder.id);
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setDragImage(card, 30, 20); } catch (_) {}
+        setTimeout(() => card.classList.add('dragging'), 0);
+      });
+      handle.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        clearDropIndicators();
+        dragSrcId = dragSrcType = null;
+      });
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (!dragSrcId || dragSrcId === folder.id || dragSrcType !== 'folder') return;
+        clearDropIndicators();
+        const rect = card.getBoundingClientRect();
+        card.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drag-over-top' : 'drag-over-bottom');
+      });
+      card.addEventListener('dragleave', (e) => {
+        if (!card.contains(e.relatedTarget)) card.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!dragSrcId || dragSrcId === folder.id || dragSrcType !== 'folder') { clearDropIndicators(); return; }
+        const before = card.classList.contains('drag-over-top');
+        clearDropIndicators();
+        reorderFolders(dragSrcId, folder.id, before);
+      });
+      handle.addEventListener('touchstart', () => {
+        touchDragSrcId   = folder.id;
+        touchDragSrcType = 'folder';
+        touchDragCard    = card;
+        card.classList.add('dragging');
+        document.addEventListener('touchmove',   onTouchMove,   { passive: false });
+        document.addEventListener('touchend',    onTouchEnd);
+        document.addEventListener('touchcancel', onTouchEnd);
+      }, { passive: true });
+    }
+
+    grid.appendChild(card);
+  });
+
+  container.appendChild(grid);
+}
+
+// ============================================================
+// Render recipe cards
+// ============================================================
+function renderRecipeCards(container, sortedRecipes) {
+  const list = document.createElement('div');
+  list.className = 'recipe-list';
+
+  sortedRecipes.forEach(recipe => {
+    const summary = recipe.ingredients.map(i => `${i.name}:${i.ratio}`).join(' / ');
+    const card = document.createElement('div');
+    card.className = 'recipe-card';
+    card.dataset.id = recipe.id;
+
+    // Build tag chips HTML for this recipe
+    const recipeTags = (recipe.tagIds || [])
+      .map(id => getTagById(id))
+      .filter(Boolean);
+    const tagsHtml = recipeTags.length > 0
+      ? `<div class="recipe-tags-display">${
+          recipeTags.map(t =>
+            `<span class="tag-chip-sm" style="background:${escAttr(t.color)};color:${escAttr(getTextColor(t.color))};border:1.5px solid ${escAttr(getTagBorderColor(t.color))};text-shadow:${escAttr(getTextShadow(t.color))}">${escHtml(t.name)}</span>`
+          ).join('')
+        }</div>`
+      : '';
+
+    card.innerHTML = `
+      <div class="drag-handle" aria-label="並べ替え" title="ドラッグして並べ替え">≡</div>
+      <div class="recipe-info" data-id="${recipe.id}">
+        <div class="recipe-name">${escHtml(recipe.name)}</div>
+        <div class="recipe-summary">${escHtml(summary)}</div>
+        ${tagsHtml}
+      </div>
+      <div class="recipe-actions">
+        <button class="btn-recipe-menu" data-id="${recipe.id}" aria-label="メニュー">⋮</button>
+      </div>`;
+
+    // Bulk edit checkbox
+    if (bulkEditMode) {
+      const cbWrap = document.createElement('div');
+      cbWrap.className = 'bulk-checkbox-wrap';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = checkedRecipeIds.has(recipe.id);
+      cbWrap.appendChild(cb);
+      card.insertBefore(cbWrap, card.firstChild);
+      card.classList.toggle('bulk-checked', checkedRecipeIds.has(recipe.id));
+      const toggleRecipeCheck = () => {
+        cb.checked = !cb.checked;
+        if (cb.checked) checkedRecipeIds.add(recipe.id);
+        else            checkedRecipeIds.delete(recipe.id);
+        card.classList.toggle('bulk-checked', cb.checked);
+        updateBulkActionBar();
+      };
+      cbWrap.addEventListener('click', (e) => { e.stopPropagation(); toggleRecipeCheck(); });
+      card.addEventListener('click', (e) => { if (!cbWrap.contains(e.target)) toggleRecipeCheck(); });
+    } else {
+      // Long-press to enter bulk edit with this card pre-checked
+      attachLongPress(card, () => {
+        bulkEditMode = true;
+        checkedRecipeIds.clear(); checkedFolderIds.clear();
+        checkedRecipeIds.add(recipe.id);
+        renderRecipeList();
+      }, '.drag-handle, .btn-recipe-menu');
+    }
+
+    list.appendChild(card);
+  });
+
+  container.appendChild(list);
+
+  container.querySelectorAll('.recipe-info').forEach(el => {
+    el.addEventListener('click', () => { if (!bulkEditMode) openCalcScreen(el.dataset.id); });
+  });
+  container.querySelectorAll('.btn-recipe-menu').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); if (!bulkEditMode) openRecipeSheet(btn.dataset.id); });
+  });
+
+  if (bulkEditMode) return;
+
+  // Desktop DnD
+  container.querySelectorAll('.recipe-card').forEach(card => {
+    const handle = card.querySelector('.drag-handle');
+    const id = card.dataset.id;
+    handle.setAttribute('draggable', 'true');
+    handle.addEventListener('dragstart', (e) => {
+      dragSrcId = id; dragSrcType = 'recipe';
+      e.dataTransfer.setData('text/plain', id);
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setDragImage(card, 30, 20); } catch (_) {}
+      setTimeout(() => card.classList.add('dragging'), 0);
+    });
+    handle.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      clearDropIndicators();
+      dragSrcId = dragSrcType = null;
+    });
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!dragSrcId || dragSrcId === id || dragSrcType !== 'recipe') return;
+      clearDropIndicators();
+      const rect = card.getBoundingClientRect();
+      card.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drag-over-top' : 'drag-over-bottom');
+    });
+    card.addEventListener('dragleave', (e) => {
+      if (!card.contains(e.relatedTarget)) card.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (!dragSrcId || dragSrcId === id || dragSrcType !== 'recipe') { clearDropIndicators(); return; }
+      const before = card.classList.contains('drag-over-top');
+      clearDropIndicators();
+      reorderRecipes(dragSrcId, id, before);
+    });
+
+    handle.addEventListener('touchstart', () => {
+      touchDragSrcId = id; touchDragSrcType = 'recipe';
+      touchDragCard = card;
+      card.classList.add('dragging');
+      document.addEventListener('touchmove',   onTouchMove,   { passive: false });
+      document.addEventListener('touchend',    onTouchEnd);
+      document.addEventListener('touchcancel', onTouchEnd);
+    }, { passive: true });
+  });
+}
+
+// ============================================================
+// Drag & Drop helpers
+// ============================================================
+function clearDropIndicators() {
+  document.querySelectorAll('.recipe-card, .folder-card').forEach(c => {
+    c.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+}
+
+function onTouchMove(e) {
+  if (!touchDragSrcId) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  clearDropIndicators();
+
+  const selector = touchDragSrcType === 'folder' ? '.folder-card' : '.recipe-card';
+  const idAttr   = touchDragSrcType === 'folder' ? 'folderId'     : 'id';
+
+  const target = el ? el.closest(selector) : null;
+  if (target && target.dataset[idAttr] !== touchDragSrcId) {
+    const rect = target.getBoundingClientRect();
+    target.classList.add(touch.clientY < rect.top + rect.height / 2 ? 'drag-over-top' : 'drag-over-bottom');
+  }
+}
+
+function onTouchEnd(e) {
+  document.removeEventListener('touchmove',   onTouchMove);
+  document.removeEventListener('touchend',    onTouchEnd);
+  document.removeEventListener('touchcancel', onTouchEnd);
+  if (!touchDragSrcId) return;
+
+  const touch = e.changedTouches[0];
+  const el    = document.elementFromPoint(touch.clientX, touch.clientY);
+
+  const selector = touchDragSrcType === 'folder' ? '.folder-card' : '.recipe-card';
+  const idAttr   = touchDragSrcType === 'folder' ? 'folderId'     : 'id';
+
+  const target = el ? el.closest(selector) : null;
+
+  if (target && target.dataset[idAttr] && target.dataset[idAttr] !== touchDragSrcId) {
+    const before = target.classList.contains('drag-over-top');
+    clearDropIndicators();
+    if (touchDragCard) touchDragCard.classList.remove('dragging');
+    if (touchDragSrcType === 'folder') {
+      reorderFolders(touchDragSrcId, target.dataset[idAttr], before);
+    } else {
+      reorderRecipes(touchDragSrcId, target.dataset[idAttr], before);
+    }
+  } else {
+    clearDropIndicators();
+    if (touchDragCard) touchDragCard.classList.remove('dragging');
+  }
+
+  touchDragSrcId = touchDragSrcType = touchDragCard = null;
+}
+
+
+function reorderRecipes(srcId, targetId, insertBefore) {
+  const sorted = [...recipes].sort((a, b) => a.order - b.order);
+  const srcIdx = sorted.findIndex(r => r.id === srcId);
+  const [src]  = sorted.splice(srcIdx, 1);
+  const tgtIdx = sorted.findIndex(r => r.id === targetId);
+  if (tgtIdx === -1)      sorted.push(src);
+  else if (insertBefore)  sorted.splice(tgtIdx, 0, src);
+  else                    sorted.splice(tgtIdx + 1, 0, src);
+  sorted.forEach((r, i) => { r.order = i; });
+  recipes = sorted;
+  saveRecipes();
+  renderRecipeList();
+  showToast('順序を変更しました');
+}
+
+function reorderFolders(srcId, targetId, insertBefore) {
+  const sorted = [...folders].sort((a, b) => a.order - b.order);
+  const srcIdx = sorted.findIndex(f => f.id === srcId);
+  const [src]  = sorted.splice(srcIdx, 1);
+  const tgtIdx = sorted.findIndex(f => f.id === targetId);
+  if (tgtIdx === -1)      sorted.push(src);
+  else if (insertBefore)  sorted.splice(tgtIdx, 0, src);
+  else                    sorted.splice(tgtIdx + 1, 0, src);
+  sorted.forEach((f, i) => { f.order = i; });
+  folders = sorted;
+  saveFolders();
+  renderRecipeList();
+  showToast('順序を変更しました');
+}
+
+// ============================================================
+// Folder view
+// ============================================================
+function openFolderView(folderId) {
+  clearTagSortMode();
+  currentFolderView = folderId;
+  activeTagFilter = new Set();
+  showScreen('folder-view');
+  renderRecipeList();
+}
+
+
+// ============================================================
+// Folder modal (create / rename)
+// ============================================================
+let _folderModalKBCleanup = null;
+
+function showFolderModal(mode, folderId = null) {
+  folderModalMode     = mode;
+  folderModalTargetId = folderId;
+  document.getElementById('modal-folder-title').textContent =
+    mode === 'create' ? 'フォルダを作成' : 'フォルダ名を変更';
+  const inp = document.getElementById('input-folder-name');
+  inp.value = (mode === 'rename' && folderId)
+    ? (folders.find(f => f.id === folderId)?.name || '') : '';
+  hideError('modal-folder-error');
+  const overlayEl = document.getElementById('modal-folder');
+  overlayEl.classList.remove('hidden');
+  _folderModalKBCleanup = attachModalKeyboard(overlayEl, overlayEl.querySelector('.modal-card'));
+  setTimeout(() => { inp.focus(); focusScrollIntoView(inp); }, 50);
+}
+
+function hideFolderModal() {
+  if (_folderModalKBCleanup) { _folderModalKBCleanup(); _folderModalKBCleanup = null; }
+  document.getElementById('modal-folder').classList.add('hidden');
+}
+
+document.getElementById('btn-modal-folder-cancel').addEventListener('click', hideFolderModal);
+document.getElementById('modal-folder').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-folder')) hideFolderModal();
+});
+
+document.getElementById('btn-modal-folder-save').addEventListener('click', saveFolderModal);
+
+function saveFolderModal() {
+  const name = document.getElementById('input-folder-name').value.trim();
+  if (!name) { showError('modal-folder-error', 'フォルダ名を入力してください。'); return; }
+
+  if (folderModalMode === 'create') {
+    const maxOrder = folders.length > 0 ? Math.max(...folders.map(f => f.order ?? 0)) : -1;
+    folders.push({ id: 'folder_' + genId(), name, order: maxOrder + 1, createdAt: new Date().toISOString() });
+    saveFolders();
+    renderRecipeList();
+    showToast('フォルダを作成しました');
+  } else {
+    const f = folders.find(x => x.id === folderModalTargetId);
+    if (f) {
+      f.name = name;
+      saveFolders();
+      if (currentFolderView === folderModalTargetId) {
+        document.getElementById('header-title').textContent = name;
+        document.getElementById('list-screen-title').textContent = name;
+      }
+      renderRecipeList();
+      showToast('フォルダ名を変更しました');
+    }
+  }
+  hideFolderModal();
+}
+
+attachIMEGuard(document.getElementById('input-folder-name'), () => {
+  if (!isComposing) saveFolderModal();
+});
+
+document.getElementById('btn-new-folder').addEventListener('click', () => showFolderModal('create'));
+
+// ============================================================
+// Move recipe dialog
+// ============================================================
+function showMoveDialog(recipeId) {
+  const recipe = recipes.find(r => r.id === recipeId);
+  const listEl = document.getElementById('move-options-list');
+  listEl.innerHTML = '';
+
+  const noOpt = document.createElement('div');
+  noOpt.className = 'move-option' + (!recipe.folderId ? ' selected' : '');
+  noOpt.innerHTML = '<span class="move-option-icon">📋</span>フォルダなし';
+  noOpt.addEventListener('click', () => { moveRecipe(recipeId, null); hideMoveDialog(); });
+  listEl.appendChild(noOpt);
+
+  [...folders].sort((a, b) => a.order - b.order).forEach(folder => {
+    const opt = document.createElement('div');
+    opt.className = 'move-option' + (recipe.folderId === folder.id ? ' selected' : '');
+    opt.innerHTML = `<span class="move-option-icon">📁</span>${escHtml(folder.name)}`;
+    opt.addEventListener('click', () => { moveRecipe(recipeId, folder.id); hideMoveDialog(); });
+    listEl.appendChild(opt);
+  });
+
+  document.getElementById('modal-move').classList.remove('hidden');
+}
+
+function hideMoveDialog() {
+  document.getElementById('modal-move').classList.add('hidden');
+}
+
+function moveRecipe(recipeId, folderId) {
+  const recipe = recipes.find(r => r.id === recipeId);
+  if (!recipe) return;
+  recipe.folderId = folderId;
+  saveRecipes();
+  renderRecipeList();
+  const label = folderId ? (folders.find(f => f.id === folderId)?.name || 'フォルダ') : 'フォルダなし';
+  showToast(`「${label}」に移動しました`);
+}
+
+document.getElementById('btn-modal-move-cancel').addEventListener('click', hideMoveDialog);
+document.getElementById('modal-move').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-move')) hideMoveDialog();
+});
+
+// ============================================================
+// Screen 1 — button wiring
+// ============================================================
+document.getElementById('btn-new-recipe').addEventListener('click', () => openFormScreen(null));
+
+// ============================================================
+// Screen 2: Recipe Form — Tag section
+// ============================================================
+function renderFormTagSection() {
+  const sec = document.getElementById('form-tag-section');
+  if (!sec) return;
+  sec.innerHTML = '';
+
+  const folderId = document.getElementById('input-recipe-folder').value || null;
+  const contextTags = getTagsForContext(folderId).sort((a, b) => a.order - b.order);
+
+  if (contextTags.length === 0 && tags.length === 0) {
+    // No tags at all — just show add button
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'tag-chip-add';
+    addBtn.textContent = '＋ 新しいタグ';
+    addBtn.addEventListener('click', () => {
+      showTagModal('create', null, renderFormTagSection);
+    });
+    sec.appendChild(addBtn);
+    return;
+  }
+
+  const lbl = document.createElement('span');
+  lbl.className = 'form-tag-section-label';
+  lbl.textContent = 'タグ';
+  sec.appendChild(lbl);
+
+  if (contextTags.length > 0) {
+    const chipsRow = document.createElement('div');
+    chipsRow.className = 'form-tag-chips';
+
+    contextTags.forEach(tag => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip-form' + (formSelectedTagIds.includes(tag.id) ? ' selected' : '');
+      chip.style.background = tag.color;
+      chip.style.color = getTextColor(tag.color);
+      chip.style.borderColor = getTagBorderColor(tag.color);
+      chip.style.textShadow = getTextShadow(tag.color);
+      chip.textContent = tag.name;
+      chip.addEventListener('click', () => toggleFormTag(tag.id));
+      chipsRow.appendChild(chip);
+    });
+
+    sec.appendChild(chipsRow);
+  } else if (tags.length > 0) {
+    // Tags exist but none are visible in this folder context
+    const note = document.createElement('div');
+    note.style.cssText = 'font-size:12px;color:#a0aec0;margin-bottom:6px';
+    note.textContent = 'このフォルダで表示されるタグはありません';
+    sec.appendChild(note);
+  }
+
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'tag-chip-add';
+  addBtn.textContent = '＋ 新しいタグ';
+  addBtn.addEventListener('click', () => {
+    showTagModal('create', null, renderFormTagSection);
+  });
+  sec.appendChild(addBtn);
+}
+
+function toggleFormTag(tagId) {
+  const idx = formSelectedTagIds.indexOf(tagId);
+  if (idx === -1) formSelectedTagIds.push(tagId);
+  else formSelectedTagIds.splice(idx, 1);
+  renderFormTagSection();
+}
+
+// Re-render tag section when folder changes
+document.getElementById('input-recipe-folder').addEventListener('change', renderFormTagSection);
+
+// ============================================================
+// Tag Modal
+// ============================================================
+let _tagModalKBCleanup = null;
+
+function showTagModal(mode, tagId, callback) {
+  tagModalMode     = mode;
+  tagModalTargetId = tagId;
+  tagModalCallback = callback || null;
+
+  const tag = tagId ? tags.find(t => t.id === tagId) : null;
+
+  document.getElementById('modal-tag-title').textContent =
+    mode === 'create' ? 'タグを作成' : 'タグを編集';
+
+  // Tag name
+  const nameInput = document.getElementById('input-tag-name');
+  nameInput.value = tag ? tag.name : '';
+
+  // Color picker
+  tagModalSelectedColor = tag ? tag.color : TAG_PRESET_COLORS[tags.length % TAG_PRESET_COLORS.length];
+  document.getElementById('input-tag-color').value = tagModalSelectedColor;
+  // Reset canvas picker state
+  _cpPickerOpen = false;
+  const pickerDiv = document.getElementById('custom-color-picker');
+  if (pickerDiv) pickerDiv.style.display = 'none';
+  const customBtn = document.getElementById('btn-custom-color');
+  if (customBtn) { customBtn.style.background = ''; customBtn.style.borderColor = ''; }
+  renderTagColorPresets();
+
+  // Scope
+  const hasFolders = folders.length > 0;
+  const scopeGroup = document.getElementById('tag-scope-group');
+  scopeGroup.style.display = hasFolders ? '' : 'none';
+
+  if (hasFolders) {
+    let isSpecific = false;
+    let selectedFolderIds = [];
+    if (tag && Array.isArray(tag.scope)) {
+      isSpecific = true;
+      selectedFolderIds = [...tag.scope];
+    }
+
+    document.getElementById('tag-scope-all').checked      = !isSpecific;
+    document.getElementById('tag-scope-specific').checked = isSpecific;
+    renderScopeFolderCheckboxes(selectedFolderIds, !isSpecific);
+
+    document.getElementById('tag-scope-all').onchange = () => {
+      updateScopeFolderDisabledState(true);
+    };
+    document.getElementById('tag-scope-specific').onchange = () => {
+      updateScopeFolderDisabledState(false);
+    };
+  }
+
+  // Delete button
+  const deleteWrap = document.getElementById('modal-tag-delete-wrap');
+  deleteWrap.innerHTML = '';
+  if (mode === 'edit' && tag) {
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-danger btn-full btn-sm';
+    delBtn.textContent = '🗑 このタグを削除';
+    delBtn.addEventListener('click', () => {
+      showConfirm(`タグ「${tag.name}」を削除しますか？\nすべてのレシピからも削除されます。`, '削除の確認', '削除').then(ok => {
+        if (!ok) return;
+        deleteTag(tagId);
+        hideTagModal();
+        if (tagModalCallback) tagModalCallback();
+        renderRecipeList();
+        showToast('タグを削除しました');
+      });
+    });
+    deleteWrap.appendChild(delBtn);
+  }
+
+  hideError('modal-tag-error');
+  const tagOverlayEl = document.getElementById('modal-tag');
+  tagOverlayEl.classList.remove('hidden');
+  _tagModalKBCleanup = attachModalKeyboard(tagOverlayEl, tagOverlayEl.querySelector('.modal-card'));
+  setTimeout(() => { nameInput.focus(); focusScrollIntoView(nameInput); }, 50);
+}
+
+
+function renderTagColorPresets() {
+  const container = document.getElementById('tag-color-presets');
+  if (!container) return;
+  const current = (document.getElementById('input-tag-color').value || '').toLowerCase();
+  container.innerHTML = '';
+  // Update selected preview bubble
+  const selPrev = document.getElementById('cp-selected-preview');
+  if (selPrev && current) {
+    selPrev.style.background = current;
+    selPrev.style.borderColor = getTagBorderColor(current);
+  }
+  TAG_PRESET_COLORS.forEach(color => {
+    const sw = document.createElement('div');
+    sw.className = 'tag-preset-swatch' + (current === color.toLowerCase() ? ' selected' : '');
+    sw.style.background = color;
+    sw.style.border = '1.5px solid ' + getTagBorderColor(color);
+    sw.addEventListener('click', () => {
+      tagModalSelectedColor = color;
+      document.getElementById('input-tag-color').value = color;
+      if (_cpPickerOpen) cpSetFromHex(color);
+      else renderTagColorPresets();
+    });
+    container.appendChild(sw);
+  });
+}
+
+function renderScopeFolderCheckboxes(selectedIds, disabled) {
+  const container = document.getElementById('tag-scope-folders');
+  container.innerHTML = '';
+  container.classList.toggle('all-mode', !!disabled);
+  [...folders].sort((a, b) => a.order - b.order).forEach(folder => {
+    const lbl = document.createElement('label');
+    lbl.className = 'tag-scope-folder-item' + (disabled ? ' disabled' : '');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = folder.id;
+    cb.checked = selectedIds.includes(folder.id);
+    cb.disabled = !!disabled;
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(folder.name));
+    container.appendChild(lbl);
+  });
+}
+
+function updateScopeFolderDisabledState(disabled) {
+  const container = document.getElementById('tag-scope-folders');
+  if (container) container.classList.toggle('all-mode', disabled);
+  document.querySelectorAll('#tag-scope-folders .tag-scope-folder-item').forEach(lbl => {
+    const cb = lbl.querySelector('input[type="checkbox"]');
+    if (cb) cb.disabled = disabled;
+    lbl.classList.toggle('disabled', disabled);
+  });
+}
+
+function hideTagModal() {
+  if (_tagModalKBCleanup) { _tagModalKBCleanup(); _tagModalKBCleanup = null; }
+  document.getElementById('modal-tag').classList.add('hidden');
+}
+
+document.getElementById('btn-modal-tag-cancel').addEventListener('click', hideTagModal);
+document.getElementById('modal-tag').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-tag')) hideTagModal();
+});
+
+document.getElementById('btn-modal-tag-save').addEventListener('click', saveTagFromModal);
+attachIMEGuard(document.getElementById('input-tag-name'), () => {
+  if (!isComposing) saveTagFromModal();
+});
+
+function saveTagFromModal() {
+  const name = document.getElementById('input-tag-name').value.trim();
+  if (!name) { showError('modal-tag-error', 'タグ名を入力してください。'); return; }
+
+  const color = tagModalSelectedColor || document.getElementById('input-tag-color').value;
+
+  // Determine scope
+  let scope = 'all';
+  const hasFolders = folders.length > 0;
+  if (hasFolders && document.getElementById('tag-scope-specific').checked) {
+    const checked = Array.from(
+      document.querySelectorAll('#tag-scope-folders input[type="checkbox"]:checked')
+    ).map(cb => cb.value);
+    if (checked.length === 0) {
+      showError('modal-tag-error', '表示するフォルダを1つ以上選択してください。');
+      return;
+    }
+    scope = checked;
+  }
+
+  if (tagModalMode === 'create') {
+    const maxTagOrder = tags.length > 0 ? Math.max(...tags.map(t => t.order ?? 0)) : -1;
+    tags.push({
+      id: 'tag_' + genId(),
+      name,
+      color,
+      scope,
+      order: maxTagOrder + 1,
+      createdAt: new Date().toISOString()
+    });
+    saveTags();
+    showToast('タグを作成しました');
+  } else {
+    const tag = tags.find(t => t.id === tagModalTargetId);
+    if (tag) {
+      tag.name  = name;
+      tag.color = color;
+      tag.scope = scope;
+      saveTags();
+      showToast('タグを更新しました');
+    }
+  }
+
+  hideTagModal();
+  if (tagModalCallback) tagModalCallback();
+  renderRecipeList();
+}
+
+function deleteTag(tagId) {
+  tags = tags.filter(t => t.id !== tagId);
+  recipes.forEach(r => {
+    if (r.tagIds) r.tagIds = r.tagIds.filter(id => id !== tagId);
+  });
+  activeTagFilter.delete(tagId);
+  saveTags();
+  saveRecipes();
+}
+
+// ============================================================
+// Export / Import UI (for settings)
+// ============================================================
+function renderExportImportUI(el) {
+  el.innerHTML = '';
+
+  // ---- Export section ----
+  const expHdr = document.createElement('span');
+  expHdr.className = 'settings-item-label';
+  expHdr.textContent = 'データのエクスポート';
+  el.appendChild(expHdr);
+
+  const checkItems = [
+    { key: 'recipes',  label: 'レシピ（ratioApp_recipes）' },
+    { key: 'folders',  label: 'フォルダ（ratioApp_folders）' },
+    { key: 'tags',     label: 'タグ（ratioApp_tags）' },
+    { key: 'settings', label: '設定（ratioApp_settings）' }
+  ];
+  const checkboxMap = {};
+  checkItems.forEach(item => {
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:14px;font-weight:normal;color:#2d3748;padding:4px 0;cursor:pointer;margin-bottom:0';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.style.cssText = 'width:18px;height:18px;accent-color:#4A90D9;flex-shrink:0';
+    checkboxMap[item.key] = cb;
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(item.label));
+    el.appendChild(lbl);
+  });
+
+  const expBtn = document.createElement('button');
+  expBtn.className = 'btn btn-primary btn-sm';
+  expBtn.style.marginTop = '10px';
+  expBtn.textContent = 'エクスポート';
+  expBtn.addEventListener('click', () => {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const dateStr = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;
+    const isoStr  = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+    const data = { exportedAt: isoStr, version: '1.0' };
+    if (checkboxMap.recipes.checked)  data.recipes  = recipes;
+    if (checkboxMap.folders.checked)  data.folders  = folders;
+    if (checkboxMap.tags.checked)     data.tags      = tags;
+    if (checkboxMap.settings.checked) data.settings  = settings;
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `ratioApp_backup_${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+  el.appendChild(expBtn);
+
+  // ---- Divider ----
+  const divider = document.createElement('div');
+  divider.style.cssText = 'height:1px;background:#e2e8f0;margin:16px 0';
+  el.appendChild(divider);
+
+  // ---- Import section ----
+  const impHdr = document.createElement('span');
+  impHdr.className = 'settings-item-label';
+  impHdr.textContent = 'データのインポート';
+  el.appendChild(impHdr);
+
+  const warn = document.createElement('p');
+  warn.style.cssText = 'font-size:13px;color:#c53030;margin-bottom:10px;line-height:1.5';
+  warn.textContent = '※ インポートすると選択した項目の現在のデータは上書きされます。事前にエクスポートでバックアップを取ることをお勧めします。';
+  el.appendChild(warn);
+
+  const fileInput = document.createElement('input');
+  fileInput.type   = 'file';
+  fileInput.accept = '.json';
+  fileInput.style.cssText = 'display:block;font-size:14px;margin-bottom:10px;max-width:100%';
+  el.appendChild(fileInput);
+
+  const impBtn = document.createElement('button');
+  impBtn.className = 'btn btn-secondary btn-sm';
+  impBtn.textContent = 'インポート';
+  impBtn.addEventListener('click', () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) { showAlert('ファイルを選択してください。', '入力エラー'); return; }
+
+    showConfirm('選択したデータを上書きインポートしますか？\n現在のデータは上書きされます。', 'インポートの確認', 'インポート', false).then(ok => {
+      if (!ok) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        let data;
+        try { data = JSON.parse(e.target.result); } catch { showAlert('インポートできないファイルです。', 'エラー'); return; }
+        if (typeof data !== 'object' || data === null || !data.version) { showAlert('インポートできないファイルです。', 'エラー'); return; }
+
+        if (data.recipes  !== undefined) { localStorage.setItem(STORAGE_KEYS.recipes,  JSON.stringify(data.recipes));  }
+        if (data.folders  !== undefined) { localStorage.setItem(STORAGE_KEYS.folders,  JSON.stringify(data.folders));  }
+        if (data.tags     !== undefined) { localStorage.setItem(STORAGE_KEYS.tags,      JSON.stringify(data.tags));     }
+        if (data.settings !== undefined) { localStorage.setItem(STORAGE_KEYS.settings,  JSON.stringify(data.settings)); }
+
+        showAlert('インポートが完了しました。ページを再読み込みします。', '完了').then(() => location.reload());
+      };
+      reader.onerror = () => { showAlert('インポートできないファイルです。', 'エラー'); };
+      reader.readAsText(file);
+    });
+  });
+  el.appendChild(impBtn);
+}
+
+// ============================================================
+// Tag Management UI (for settings)
+// ============================================================
+function renderTagManagementUI(el) {
+  el.innerHTML = '';
+
+  const hdr = document.createElement('span');
+  hdr.className = 'settings-item-label';
+  hdr.textContent = 'タグ管理';
+  el.appendChild(hdr);
+
+  // ── Control row ──
+  const ctrlRow = document.createElement('div');
+  ctrlRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap';
+
+  if (!tagBulkDeleteMode) {
+    const hint = document.createElement('span');
+    hint.style.cssText = 'font-size:11px;color:#a0aec0;';
+    hint.textContent = '長押しで一括削除';
+    ctrlRow.appendChild(hint);
+  } else {
+    // 全選択/全解除
+    const allChecked = tags.length > 0 && tags.every(t => checkedTagIds.has(t.id));
+    const selAllBtn = document.createElement('button');
+    selAllBtn.className = 'btn btn-secondary btn-sm';
+    selAllBtn.textContent = allChecked ? '全解除' : '全選択';
+    selAllBtn.addEventListener('click', () => {
+      if (allChecked) checkedTagIds.clear();
+      else tags.forEach(t => checkedTagIds.add(t.id));
+      renderTagManagementUI(el);
+    });
+    ctrlRow.appendChild(selAllBtn);
+
+    // 削除を実行
+    const execBtn = document.createElement('button');
+    execBtn.className = 'btn btn-danger btn-sm';
+    execBtn.textContent = '削除を実行';
+    execBtn.disabled = checkedTagIds.size === 0;
+    execBtn.addEventListener('click', () => {
+      const count = checkedTagIds.size;
+      if (count === 0) return;
+      showConfirm(`選択した${count}件のタグを削除しますか？該当タグが全レシピから外れます。`, '削除の確認', '削除').then(ok => {
+        if (!ok) return;
+        [...checkedTagIds].forEach(tagId => deleteTag(tagId));
+        tagBulkDeleteMode = false;
+        checkedTagIds.clear();
+        renderSettings();
+        showToast(`${count}件のタグを削除しました`);
+      });
+    });
+    ctrlRow.appendChild(execBtn);
+
+    // 完了
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-secondary btn-sm';
+    cancelBtn.textContent = '完了';
+    cancelBtn.addEventListener('click', () => {
+      tagBulkDeleteMode = false;
+      checkedTagIds.clear();
+      renderTagManagementUI(el);
+    });
+    ctrlRow.appendChild(cancelBtn);
+  }
+
+  el.appendChild(ctrlRow);
+
+  if (tags.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'tag-mgmt-empty';
+    empty.textContent = 'タグがありません';
+    el.appendChild(empty);
+  } else {
+    const groups = buildTagGroups();
+    groups.forEach(group => {
+      const grpHdr = document.createElement('div');
+      grpHdr.className = 'tag-mgmt-group-header';
+      grpHdr.textContent = group.label;
+      el.appendChild(grpHdr);
+
+      const list = document.createElement('div');
+      list.className = 'tag-mgmt-list';
+
+      group.tags.forEach(tag => {
+        const item = document.createElement('div');
+        item.className = 'tag-mgmt-item';
+        item.dataset.tagId = tag.id;
+
+        if (tagBulkDeleteMode) {
+          // Checkbox
+          const cbWrap = document.createElement('div');
+          cbWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;width:36px;min-height:44px;flex-shrink:0;cursor:pointer';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = checkedTagIds.has(tag.id);
+          cb.style.cssText = 'width:18px;height:18px;accent-color:#4A90D9;pointer-events:none';
+          cbWrap.appendChild(cb);
+          const toggle = () => {
+            if (checkedTagIds.has(tag.id)) checkedTagIds.delete(tag.id);
+            else checkedTagIds.add(tag.id);
+            renderTagManagementUI(el);
+          };
+          cbWrap.addEventListener('click', toggle);
+          item.addEventListener('click', (e) => { if (!cbWrap.contains(e.target)) toggle(); });
+          item.appendChild(cbWrap);
+          if (checkedTagIds.has(tag.id)) item.style.background = '#ebf4ff';
+        }
+
+        const dot = document.createElement('div');
+        dot.className = 'tag-mgmt-dot';
+        dot.style.background = tag.color;
+
+        const info = document.createElement('div');
+        info.className = 'tag-mgmt-info';
+        info.innerHTML = `<div class="tag-mgmt-name">${escHtml(tag.name)}</div>
+          <div class="tag-mgmt-scope">${escHtml(getScopeLabel(tag.scope))}</div>`;
+
+        item.appendChild(dot);
+        item.appendChild(info);
+
+        if (!tagBulkDeleteMode) {
+          const editBtn = document.createElement('button');
+          editBtn.className = 'btn btn-secondary btn-sm';
+          editBtn.textContent = '編集';
+          editBtn.addEventListener('click', () => showTagModal('edit', tag.id, () => renderSettings()));
+          item.appendChild(editBtn);
+
+          attachLongPress(item, () => {
+            tagBulkDeleteMode = true;
+            checkedTagIds.clear();
+            checkedTagIds.add(tag.id);
+            renderTagManagementUI(el);
+          }, '.btn');
+        }
+
+        list.appendChild(item);
+      });
+
+      el.appendChild(list);
+    });
+  }
+
+  if (!tagBulkDeleteMode) {
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn btn-secondary btn-sm';
+    addBtn.style.marginTop = '8px';
+    addBtn.textContent = '＋ タグを追加';
+    addBtn.addEventListener('click', () => showTagModal('create', null, () => renderSettings()));
+    el.appendChild(addBtn);
+  }
+}
+
+// ============================================================
+// Screen 2: Recipe Form (modal)
+// ============================================================
+let _recipeFormVVHandler = null;
+
+function openRecipeFormModal() {
+  const modal = document.getElementById('modal-recipe-form');
+  const panel = document.getElementById('recipe-form-panel');
+  modal.style.display = 'flex';
+  requestAnimationFrame(() => {
+    modal.classList.add('visible');
+    panel.classList.add('visible');
+  });
+  if (window.visualViewport && !_recipeFormVVHandler) {
+    _recipeFormVVHandler = () => {
+      const vv = window.visualViewport;
+      const keyboardH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      modal.style.paddingBottom = keyboardH > 0 ? keyboardH + 'px' : '';
+      panel.style.maxHeight = Math.floor(vv.height * 0.92) + 'px';
+    };
+    window.visualViewport.addEventListener('resize', _recipeFormVVHandler);
+    window.visualViewport.addEventListener('scroll', _recipeFormVVHandler);
+  }
+}
+
+function closeRecipeFormModal() {
+  const modal = document.getElementById('modal-recipe-form');
+  const panel = document.getElementById('recipe-form-panel');
+  modal.classList.remove('visible');
+  panel.classList.remove('visible');
+  modal.style.paddingBottom = '';
+  if (window.visualViewport && _recipeFormVVHandler) {
+    window.visualViewport.removeEventListener('resize', _recipeFormVVHandler);
+    window.visualViewport.removeEventListener('scroll', _recipeFormVVHandler);
+    _recipeFormVVHandler = null;
+  }
+  setTimeout(() => { modal.style.display = 'none'; }, 220);
+}
+
+function isRecipeFormDirty() {
+  const name = document.getElementById('input-recipe-name').value.trim();
+  const recipe = currentRecipeId ? recipes.find(r => r.id === currentRecipeId) : null;
+
+  if (recipe) {
+    // Edit mode: only dirty if something actually changed
+    if (name !== recipe.name) return true;
+    const folderId = document.getElementById('input-recipe-folder').value || null;
+    if (folderId !== (recipe.folderId || null)) return true;
+    const currentTagIds = [...formSelectedTagIds].sort().join(',');
+    const originalTagIds = [...(recipe.tagIds || [])].sort().join(',');
+    if (currentTagIds !== originalTagIds) return true;
+    const rows = document.getElementById('ingredients-container').querySelectorAll('.ingredient-row');
+    if (rows.length !== recipe.ingredients.length) return true;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const n = row.querySelector('.ingredient-name').value.trim();
+      const r = parseFloat(row.querySelector('.ingredient-ratio').value);
+      if (n !== recipe.ingredients[i].name) return true;
+      if (r !== recipe.ingredients[i].ratio) return true;
+    }
+    return false;
+  } else {
+    // New recipe: dirty if any content entered
+    if (name) return true;
+    const rows = document.getElementById('ingredients-container').querySelectorAll('.ingredient-row');
+    for (const row of rows) {
+      if (row.querySelector('.ingredient-name').value.trim()) return true;
+      if (row.querySelector('.ingredient-ratio').value.trim()) return true;
+    }
+    return false;
+  }
+}
+
+document.getElementById('recipe-form-overlay').addEventListener('click', () => {
+  if (isRecipeFormDirty()) {
+    showConfirm('編集内容を破棄しますか？', '確認', '破棄').then(ok => { if (ok) closeRecipeFormModal(); });
+    return;
+  }
+  closeRecipeFormModal();
+});
+
+document.getElementById('btn-recipe-form-close').addEventListener('click', () => {
+  closeRecipeFormModal();
+});
+
+function openFormScreen(editId) {
+  clearPrevRatios();
+  currentRecipeId = editId;
+  const recipe = editId ? recipes.find(r => r.id === editId) : null;
+  const nameInput = document.getElementById('input-recipe-name');
+  nameInput.value = recipe ? recipe.name : '';
+  hideError('form-error');
+
+  document.getElementById('recipe-form-title').textContent = editId ? 'レシピを編集' : 'レシピを登録';
+
+  // Folder select
+  const folderSel = document.getElementById('input-recipe-folder');
+  folderSel.innerHTML = '<option value="">フォルダなし</option>';
+  [...folders].sort((a, b) => a.order - b.order).forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.id;
+    opt.textContent = f.name;
+    folderSel.appendChild(opt);
+  });
+  const preselect = recipe ? (recipe.folderId || '') : (currentFolderView || '');
+  folderSel.value = preselect;
+
+  // Tag state
+  formSelectedTagIds = recipe ? [...(recipe.tagIds || [])] : [];
+  renderFormTagSection();
+
+  const container = document.getElementById('ingredients-container');
+  container.innerHTML = '';
+  const initial = recipe
+    ? recipe.ingredients
+    : [{ name: '', ratio: '' }, { name: '', ratio: '' }];
+  initial.forEach(ing => addIngredientRow(ing.name, ing.ratio));
+
+  // Restore details section open/close state
+  const detailsBody = document.getElementById('form-details-body');
+  const detailsBtn  = document.getElementById('btn-form-details-toggle');
+  const detailOpen  = localStorage.getItem('recipeFormDetailOpen') !== 'false';
+  if (detailOpen) {
+    detailsBody.style.maxHeight = '600px';
+    detailsBtn.textContent = '詳細設定 ▲';
+  } else {
+    detailsBody.style.maxHeight = '0';
+    detailsBtn.textContent = '詳細設定 ▼';
+  }
+
+  openRecipeFormModal();
+  setTimeout(() => { nameInput.focus(); focusScrollIntoView(nameInput); }, 280);
+}
+
+function addIngredientRow(name = '', ratio = '') {
+  const container = document.getElementById('ingredients-container');
+  const row = document.createElement('div');
+  row.className = 'ingredient-row';
+  row.innerHTML = `
+    <input class="input input-sm ingredient-name"  type="text"   placeholder="材料名（例：赤）" maxlength="30" value="${escAttr(name)}">
+    <input class="input input-sm ingredient-ratio" type="number" inputmode="decimal" placeholder="比率" min="0" step="any" value="${escAttr(String(ratio))}">
+    <button class="btn-remove-ingredient" aria-label="削除">×</button>`;
+  container.appendChild(row);
+  const nameInp2 = row.querySelector('.ingredient-name');
+  attachIMEGuard(nameInp2, null);
+  nameInp2.addEventListener('focus', () => focusScrollIntoView(nameInp2));
+  const ratioInp = row.querySelector('.ingredient-ratio');
+  ratioInp.addEventListener('focus', () => focusScrollIntoView(ratioInp));
+  ratioInp.addEventListener('input', () => {
+    document.getElementById('btn-normalize-ratio').disabled = false;
+  });
+  ratioInp.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    const cur = parseFloat(ratioInp.value);
+    const isUp = e.key === 'ArrowUp';
+    let next;
+    if (isNaN(cur)) {
+      next = 1;
+    } else if (Number.isInteger(cur)) {
+      next = isUp ? cur + 1 : cur - 1;
+    } else {
+      next = isUp ? Math.ceil(cur) : Math.floor(cur);
+    }
+    ratioInp.value = Math.max(1, next);
+  });
+  row.querySelector('.btn-remove-ingredient').addEventListener('click', () => {
+    if (container.querySelectorAll('.ingredient-row').length > 2) {
+      row.remove();
+      clearPrevRatios();
+    } else showToast('最低2組の材料が必要です');
+    updateRemoveButtons();
+  });
+  updateRemoveButtons();
+}
+
+function updateRemoveButtons() {
+  const rows = document.getElementById('ingredients-container').querySelectorAll('.ingredient-row');
+  rows.forEach(r => { r.querySelector('.btn-remove-ingredient').disabled = rows.length <= 2; });
+}
+
+// State for ratio undo
+let prevRatios = null;
+
+function clearPrevRatios() {
+  prevRatios = null;
+  document.getElementById('btn-undo-ratio').disabled    = true;
+  document.getElementById('btn-normalize-ratio').disabled = false;
+}
+
+function decimalPlaces(n) {
+  const s = String(n);
+  const dot = s.indexOf('.');
+  return dot === -1 ? 0 : s.length - dot - 1;
+}
+function gcdTwo(a, b) { while (b) { const t = b; b = a % b; a = t; } return a; }
+
+document.getElementById('btn-add-ingredient').addEventListener('click', () => {
+  addIngredientRow();
+  updateRemoveButtons();
+  clearPrevRatios();
+});
+
+document.getElementById('btn-normalize-ratio').addEventListener('click', () => {
+  const ratioInputs = [...document.getElementById('ingredients-container')
+    .querySelectorAll('.ingredient-ratio')];
+  const rawValues = ratioInputs.map(inp => parseFloat(inp.value));
+
+  if (rawValues.some(v => isNaN(v) || v <= 0)) {
+    showAlert('比率が入力されていない材料があります', '入力エラー');
+    return;
+  }
+
+  // Save current values before converting (overwrites any previous save)
+  prevRatios = ratioInputs.map(inp => inp.value);
+
+  // Normalize: multiply by 10^maxDecimals to get integers, then divide by GCD
+  const maxDec     = Math.max(...rawValues.map(decimalPlaces));
+  const mult       = Math.pow(10, maxDec);
+  const integers   = rawValues.map(v => Math.round(v * mult));
+  const g          = integers.reduce((acc, n) => gcdTwo(acc, n));
+  const normalized = integers.map(n => n / g);
+  ratioInputs.forEach((inp, i) => { inp.value = normalized[i]; });
+
+  // Enable undo, disable normalize
+  document.getElementById('btn-undo-ratio').disabled      = false;
+  document.getElementById('btn-normalize-ratio').disabled = true;
+});
+
+document.getElementById('btn-undo-ratio').addEventListener('click', () => {
+  if (!prevRatios) return;
+  const ratioInputs = [...document.getElementById('ingredients-container')
+    .querySelectorAll('.ingredient-ratio')];
+  ratioInputs.forEach((inp, i) => { if (prevRatios[i] !== undefined) inp.value = prevRatios[i]; });
+  clearPrevRatios();
+});
+
+document.getElementById('btn-save-recipe').addEventListener('click', saveRecipe);
+document.getElementById('btn-cancel-form').addEventListener('click', () => {
+  closeRecipeFormModal();
+});
+document.getElementById('btn-form-details-toggle').addEventListener('click', () => {
+  const detailsBody = document.getElementById('form-details-body');
+  const detailsBtn  = document.getElementById('btn-form-details-toggle');
+  const isOpen = detailsBody.style.maxHeight !== '0' && detailsBody.style.maxHeight !== '0px';
+  if (isOpen) {
+    detailsBody.style.maxHeight = '0';
+    detailsBtn.textContent = '詳細設定 ▼';
+    localStorage.setItem('recipeFormDetailOpen', 'false');
+  } else {
+    detailsBody.style.maxHeight = detailsBody.scrollHeight + 'px';
+    detailsBtn.textContent = '詳細設定 ▲';
+    localStorage.setItem('recipeFormDetailOpen', 'true');
+  }
+});
+attachIMEGuard(document.getElementById('input-recipe-name'), null);
+
+// Search bar
+(function() {
+  const inp = document.getElementById('recipe-search');
+  const clr = document.getElementById('recipe-search-clear');
+
+  function applySearch() {
+    searchQuery = inp.value.trim().toLowerCase();
+    clr.style.display = searchQuery ? '' : 'none';
+    renderRecipeList();
+  }
+
+  inp.addEventListener('compositionstart', () => { isSearchComposing = true; });
+  inp.addEventListener('compositionend',   () => { isSearchComposing = false; applySearch(); });
+  inp.addEventListener('input', () => { if (!isSearchComposing) applySearch(); });
+  inp.addEventListener('focus', () => focusScrollIntoView(inp));
+
+  clr.addEventListener('click', () => {
+    inp.value = '';
+    searchQuery = '';
+    clr.style.display = 'none';
+    renderRecipeList();
+    inp.focus();
+  });
+})();
+
+function saveRecipe() {
+  const name = document.getElementById('input-recipe-name').value.trim();
+  const folderId = document.getElementById('input-recipe-folder').value || null;
+  const rows = document.getElementById('ingredients-container').querySelectorAll('.ingredient-row');
+  const ingredients = [];
+  let valid = true;
+
+  if (!name) { showError('form-error', 'レシピ名を入力してください。'); return; }
+
+  rows.forEach(row => {
+    const n = row.querySelector('.ingredient-name').value.trim();
+    const rRaw = row.querySelector('.ingredient-ratio').value.trim();
+    if (!n && !rRaw) return; // skip completely blank rows
+    const r = parseFloat(rRaw);
+    if (!n || isNaN(r) || r <= 0) valid = false;
+    ingredients.push({ name: n, ratio: r });
+  });
+
+  if (ingredients.length === 0) { showError('form-error', '材料を1つ以上入力してください。'); return; }
+  if (!valid) { showError('form-error', '材料名と比率（0より大きい数値）をすべて入力してください。'); return; }
+
+  const tagIds = [...formSelectedTagIds];
+
+  if (currentRecipeId) {
+    const idx = recipes.findIndex(r => r.id === currentRecipeId);
+    if (idx !== -1) recipes[idx] = { ...recipes[idx], name, ingredients, folderId, tagIds };
+  } else {
+    const maxOrder = recipes.length > 0 ? Math.max(...recipes.map(r => r.order ?? 0)) : -1;
+    recipes.push({ id: genId(), name, ingredients, order: maxOrder + 1, folderId, tagIds, savedAmounts: [], memo: '' });
+  }
+  saveRecipes();
+  showToast(currentRecipeId ? 'レシピを更新しました' : 'レシピを保存しました');
+  // BUG-003 fix: preserve folder context so user stays in the folder they were editing
+  // Update currentFolderView to match where the saved recipe ended up
+  currentFolderView = folderId;
+  searchQuery = '';
+  const si = document.getElementById('recipe-search');
+  if (si) { si.value = ''; document.getElementById('recipe-search-clear').style.display = 'none'; }
+  renderRecipeList();
+  const screenToShow = folderId ? 'folder-view' : 'list';
+  // Push to history only if we're transitioning to a new view (e.g. main list → folder)
+  const alreadyThere = historyStack[historyStack.length - 1] === screenToShow;
+  showScreen(screenToShow, !alreadyThere);
+  closeRecipeFormModal();
+}
+
+// ============================================================
+// Screen 3: Calculate
+// ============================================================
+function openCalcScreen(recipeId) {
+  calcRecipeId = recipeId;
+  const recipe = recipes.find(r => r.id === recipeId);
+  if (!recipe) return;
+  if (settings.lastRecipe) { settings.lastOpenedRecipeId = recipeId; saveSettings(); }
+  document.getElementById('calc-recipe-name').textContent = recipe.name;
+  document.getElementById('calc-ratio-badges').innerHTML = recipe.ingredients
+    .map(i => `<span class="ratio-badge">${escHtml(i.name)} : ${escHtml(String(i.ratio))}</span>`)
+    .join('');
+  document.getElementById('input-total-amount').value = '';
+  document.getElementById('input-unit').value = '';
+  document.getElementById('calc-result').style.display = 'none';
+  document.getElementById('btn-total-copy').disabled = true;
+  document.getElementById('btn-total-memo').disabled = true;
+  hideError('calc-error');
+  // Init ingredient sets
+  calcIngredientSets = [{ id: genId(), lastEditedIdx: null, activeInputIdx: null, values: recipe.ingredients.map(() => '') }];
+  renderCalcIngredientSets(recipe);
+  renderSavedAmounts(recipe);
+
+  // Calc screen memo
+  const calcMemoTA = document.getElementById('calc-memo-textarea');
+  calcMemoTA.value = recipe.memo || '';
+  calcMemoTA.style.height = 'auto';
+  calcMemoTA.style.height = Math.max(80, calcMemoTA.scrollHeight) + 'px';
+  document.getElementById('btn-memo-copy').disabled = !calcMemoTA.value;
+  let isMemoComposing = false;
+  let memoSaveTimer = null;
+  const saveMemoDebounced = () => {
+    clearTimeout(memoSaveTimer);
+    memoSaveTimer = setTimeout(() => { recipe.memo = calcMemoTA.value; saveRecipes(); }, 400);
+  };
+  calcMemoTA.oninput = null;
+  calcMemoTA.oncompositionstart = () => { isMemoComposing = true; };
+  calcMemoTA.oncompositionend   = () => {
+    isMemoComposing = false;
+    saveMemoDebounced();
+  };
+  calcMemoTA.oninput = function() {
+    this.style.height = 'auto';
+    this.style.height = Math.max(80, this.scrollHeight) + 'px';
+    document.getElementById('btn-memo-copy').disabled = !this.value;
+    if (!isMemoComposing) saveMemoDebounced();
+  };
+
+  // Register save button handler (overwrite any previous)
+  document.getElementById('saveAmountBtn').onclick = () => {
+    const val = parseFloat(document.getElementById('input-total-amount').value);
+    if (isNaN(val) || val <= 0) return;
+    if (!recipe.savedAmounts) recipe.savedAmounts = [];
+    if (recipe.savedAmounts.includes(val)) return;
+    recipe.savedAmounts.push(val);
+    saveRecipes();
+    renderSavedAmounts(recipe);
+  };
+
+  showScreen('calc');
+}
+
+// ============================================================
+// Ingredient-based calculation sets
+// ============================================================
+function addCalcIngredientSet(recipe) {
+  calcIngredientSets.push({ id: genId(), lastEditedIdx: null, activeInputIdx: null, values: recipe.ingredients.map(() => '') });
+  renderCalcIngredientSets(recipe);
+}
+
+function removeCalcIngredientSet(setId) {
+  calcIngredientSets = calcIngredientSets.filter(s => s.id !== setId);
+  const recipe = recipes.find(r => r.id === calcRecipeId);
+  renderCalcIngredientSets(recipe);
+}
+
+function renderCalcIngredientSets(recipe) {
+  const container = document.getElementById('calc-ingredient-sets');
+  if (!container || !recipe) return;
+  container.innerHTML = '';
+
+  calcIngredientSets.forEach((set, setIdx) => {
+    const setDiv = document.createElement('div');
+    setDiv.className = 'calc-ing-set';
+    setDiv.dataset.setId = set.id;
+
+    if (setIdx > 0) {
+      const header = document.createElement('div');
+      header.className = 'calc-ing-set-header';
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn-remove-calc-set';
+      removeBtn.type = 'button';
+      removeBtn.textContent = '✕';
+      removeBtn.addEventListener('click', () => removeCalcIngredientSet(set.id));
+      header.appendChild(removeBtn);
+      setDiv.appendChild(header);
+    }
+
+    recipe.ingredients.forEach((ing, ingIdx) => {
+      const row = document.createElement('div');
+      row.className = 'calc-ing-row';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'calc-ing-name';
+      nameEl.textContent = ing.name;
+
+      const inp = document.createElement('input');
+      inp.className = 'input input-sm calc-ing-input';
+      inp.type = 'number';
+      inp.inputMode = 'decimal';
+      inp.placeholder = '数値';
+      inp.min = '0';
+      inp.dataset.ingIdx = ingIdx;
+      inp.value = set.values[ingIdx] || '';
+      inp.addEventListener('focus', () => { set.activeInputIdx = ingIdx; focusScrollIntoView(inp); });
+      inp.addEventListener('blur',  () => { set.activeInputIdx = null; });
+      inp.addEventListener('input', () => {
+        set.values[ingIdx] = inp.value;
+        set.lastEditedIdx = inp.value ? ingIdx : null;
+        if (!inp.value) {
+          for (let i = 0; i < set.values.length; i++) {
+            if (set.values[i]) { set.lastEditedIdx = i; break; }
+          }
+        }
+        updateCalcIngredientSet(set, recipe, setDiv);
+      });
+
+      row.appendChild(nameEl);
+      row.appendChild(inp);
+      setDiv.appendChild(row);
+    });
+
+    // +10/+50/+100/Reset buttons for this set
+    const btnRow = document.createElement('div');
+    btnRow.className = 'amount-btn-row';
+    btnRow.style.marginTop = '8px';
+    [10, 50, 100].forEach(delta => {
+      const b = document.createElement('button');
+      b.className = 'btn-amount';
+      b.type = 'button';
+      b.textContent = '+' + delta;
+      b.addEventListener('click', () => {
+        const idx = set.activeInputIdx !== null ? set.activeInputIdx
+                  : set.lastEditedIdx   !== null ? set.lastEditedIdx : 0;
+        const inputs = setDiv.querySelectorAll('.calc-ing-input');
+        const inp2 = inputs[idx];
+        if (!inp2) return;
+        const cur = parseFloat(inp2.value) || 0;
+        inp2.value = cur + delta;
+        set.values[idx] = inp2.value;
+        set.lastEditedIdx = idx;
+        updateCalcIngredientSet(set, recipe, setDiv);
+      });
+      btnRow.appendChild(b);
+    });
+    const resetB = document.createElement('button');
+    resetB.className = 'btn-amount btn-amount-reset';
+    resetB.type = 'button';
+    resetB.textContent = 'リセット';
+    resetB.addEventListener('click', () => {
+      const inputs = setDiv.querySelectorAll('.calc-ing-input');
+      inputs.forEach((inp2, idx) => { inp2.value = ''; set.values[idx] = ''; });
+      set.lastEditedIdx = null;
+    });
+    btnRow.appendChild(resetB);
+    setDiv.appendChild(btnRow);
+
+    // Copy / Memo buttons for this ingredient set
+    const actionRow = document.createElement('div');
+    actionRow.className = 'result-action-row';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn btn-secondary btn-sm';
+    copyBtn.type = 'button';
+    copyBtn.textContent = 'コピー';
+    copyBtn.disabled = true;
+    copyBtn.dataset.role = 'ing-copy';
+    copyBtn.addEventListener('click', () => {
+      const unit = document.getElementById('input-unit').value.trim() || '';
+      const text = getIngSetResultText(set, recipe, unit);
+      if (!text) return;
+      navigator.clipboard.writeText(text)
+        .then(() => tempBtnText(copyBtn, 'コピーしました'))
+        .catch(() => tempBtnText(copyBtn, 'コピー失敗'));
+    });
+    const memoBtn = document.createElement('button');
+    memoBtn.className = 'btn btn-secondary btn-sm';
+    memoBtn.type = 'button';
+    memoBtn.textContent = 'メモに出力';
+    memoBtn.disabled = true;
+    memoBtn.dataset.role = 'ing-memo';
+    memoBtn.addEventListener('click', () => {
+      const unit    = document.getElementById('input-unit').value.trim() || '';
+      const ingIdx  = set.lastEditedIdx;
+      const ingName = ingIdx !== null ? recipe.ingredients[ingIdx].name : '';
+      const inputVal = ingIdx !== null ? (set.values[ingIdx] || '') : '';
+      const header  = `${nowLabel()}\n${ingName}を基準: ${inputVal}${unit}入力`;
+      const line    = getIngSetResultText(set, recipe, unit);
+      if (!line) return;
+      appendToMemo(`${header}\n${line}`);
+      tempBtnText(memoBtn, '出力しました');
+    });
+    actionRow.appendChild(copyBtn);
+    actionRow.appendChild(memoBtn);
+    setDiv.appendChild(actionRow);
+
+    container.appendChild(setDiv);
+    updateCalcIngredientSet(set, recipe, setDiv);
+  });
+}
+
+function getIngSetResultText(set, recipe, unit) {
+  if (set.lastEditedIdx === null) return '';
+  const parts = recipe.ingredients.map((ing, idx) => {
+    const v = set.values[idx];
+    return v ? `${ing.name}: ${v}${unit}` : null;
+  }).filter(Boolean);
+  return parts.join(' / ');
+}
+
+function updateCalcIngredientSet(set, recipe, setDiv) {
+  if (set.lastEditedIdx === null) return;
+  const ingIdx = set.lastEditedIdx;
+  const inputVal = parseFloat(set.values[ingIdx]);
+  if (isNaN(inputVal) || inputVal <= 0) return;
+
+  const srcRatio = recipe.ingredients[ingIdx].ratio;
+  const inputs = setDiv.querySelectorAll('.calc-ing-input');
+
+  inputs.forEach((inp, idx) => {
+    if (idx === ingIdx) return;
+    const result = (inputVal / srcRatio) * recipe.ingredients[idx].ratio;
+    const formatted = formatCalcResult(result);
+    inp.value = formatted;          // direct assignment — no input event fired
+    set.values[idx] = formatted;
+  });
+
+  // Enable copy/memo buttons for this set
+  setDiv.querySelectorAll('[data-role="ing-copy"],[data-role="ing-memo"]').forEach(b => { b.disabled = false; });
+}
+
+function updateAllCalcIngredientSets() {
+  const recipe = recipes.find(r => r.id === calcRecipeId);
+  if (!recipe) return;
+  document.querySelectorAll('#calc-ingredient-sets .calc-ing-set').forEach(setDiv => {
+    const set = calcIngredientSets.find(s => s.id === setDiv.dataset.setId);
+    if (set) updateCalcIngredientSet(set, recipe, setDiv);
+  });
+}
+
+function formatCalcResult(n) {
+  if (Number.isInteger(n)) return String(n);
+  // Up to 4 decimal places, trim trailing zeros
+  return parseFloat(n.toFixed(4)).toString();
+}
+
+document.getElementById('btn-add-calc-set').addEventListener('click', () => {
+  const recipe = recipes.find(r => r.id === calcRecipeId);
+  if (recipe) addCalcIngredientSet(recipe);
+});
+
+// Total-amount +/Reset buttons
+document.getElementById('total-amount-buttons').addEventListener('click', e => {
+  const btn = e.target.closest('[data-delta]');
+  if (!btn) return;
+  const inp = document.getElementById('input-total-amount');
+  const delta = parseInt(btn.dataset.delta, 10);
+  if (delta === 0) {
+    inp.value = '';
+  } else {
+    inp.value = (parseFloat(inp.value) || 0) + delta;
+  }
+  inp.dispatchEvent(new Event('input'));
+});
+
+// Saved amounts
+function renderSavedAmounts(recipe) {
+  if (!recipe) return;
+  const section = document.getElementById('saved-amounts-section');
+  const chipsEl = document.getElementById('saved-amounts-chips');
+  if (!section || !chipsEl) return;
+  const amounts = recipe.savedAmounts || [];
+  section.style.display = amounts.length > 0 ? 'block' : 'none';
+  chipsEl.innerHTML = '';
+  amounts.forEach((val, idx) => {
+    const chip = document.createElement('span');
+    chip.className = 'saved-amount-chip';
+    chip.textContent = val;
+    chip.addEventListener('click', () => {
+      const inp = document.getElementById('input-total-amount');
+      inp.value = val;
+      inp.dispatchEvent(new Event('input'));
+    });
+    const del = document.createElement('button');
+    del.className = 'saved-amount-chip-del';
+    del.type = 'button';
+    del.textContent = '✕';
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      recipe.savedAmounts.splice(idx, 1);
+      saveRecipes();
+      renderSavedAmounts(recipe);
+    });
+    chip.appendChild(del);
+    chipsEl.appendChild(chip);
+  });
+}
+
+document.getElementById('input-total-amount').addEventListener('input', calculate);
+document.getElementById('input-total-amount').addEventListener('focus', function() { focusScrollIntoView(this); });
+document.getElementById('input-unit').addEventListener('input', () => {
+  calculate();
+});
+document.getElementById('input-unit').addEventListener('focus', function() { focusScrollIntoView(this); });
+attachIMEGuard(document.getElementById('input-unit'), null);
+document.getElementById('calc-memo-textarea').addEventListener('focus', function() { focusScrollIntoView(this); });
+
+function calculate() {
+  const recipe = recipes.find(r => r.id === calcRecipeId);
+  if (!recipe) return;
+  const rawVal = document.getElementById('input-total-amount').value;
+  const totalInput = parseFloat(rawVal);
+  const unit = document.getElementById('input-unit').value.trim() || '';
+
+  if (!rawVal) {
+    document.getElementById('calc-result').style.display = 'none';
+    document.getElementById('btn-total-copy').disabled = true;
+    document.getElementById('btn-total-memo').disabled = true;
+    hideError('calc-error');
+    return;
+  }
+  if (isNaN(totalInput) || totalInput <= 0) {
+    showError('calc-error', '希望の総量に0より大きい数値を入力してください。');
+    document.getElementById('calc-result').style.display = 'none';
+    document.getElementById('btn-total-copy').disabled = true;
+    document.getElementById('btn-total-memo').disabled = true;
+    return;
+  }
+  hideError('calc-error');
+
+  const mode        = settings.roundingMode || 'round';
+  const ingredients = recipe.ingredients;
+  const ratioSum    = ingredients.reduce((s, i) => s + i.ratio, 0);
+  const modeLabels  = { round: '四捨五入', floor: '切り捨て', ceil: '切り上げ', approximate: '近似値', none: '端数処理なし' };
+
+  let amounts = [], actualTotal, noteText = '';
+  let useNoneMode = false;
+
+  if (mode === 'approximate') {
+    // Convert ratios to integers to guarantee integer results
+    const rawRatios = ingredients.map(i => i.ratio);
+    const maxDec = rawRatios.reduce((m, r) => {
+      const s = r.toString(); const d = s.indexOf('.');
+      return d === -1 ? m : Math.max(m, s.length - d - 1);
+    }, 0);
+    const mult = Math.pow(10, maxDec);
+    const intRatios = rawRatios.map(r => Math.round(r * mult));
+    const intSum = intRatios.reduce((s, r) => s + r, 0);
+    const kApprox = totalInput / intSum;
+    // Use at least k=1 to guarantee positive results; also check k=0 only when input < intSum/2
+    const kLow  = kApprox < 0.5 ? 0 : Math.max(1, Math.floor(kApprox));
+    const kHigh = kLow + 1;
+    const k = Math.abs(kHigh * intSum - totalInput) <= Math.abs(kLow * intSum - totalInput) ? kHigh : Math.max(1, kLow);
+    amounts = intRatios.map(r => r * k);
+    actualTotal = amounts.reduce((s, v) => s + v, 0);
+    const adj = k * intSum;
+    if (Math.abs(adj - totalInput) > 0.0001)
+      noteText = `※ 整数で割り切れるよう、総量を ${fmtNum(adj)}${unit} に調整しました`;
+  } else if (mode === 'none') {
+    useNoneMode = true;
+    amounts = ingredients.map(i => (i.ratio / ratioSum) * totalInput);
+    actualTotal = totalInput;
+  } else {
+    const fn = mode === 'floor' ? Math.floor : mode === 'ceil' ? Math.ceil : Math.round;
+    amounts = ingredients.map(i => fn((i.ratio / ratioSum) * totalInput));
+    actualTotal = amounts.reduce((s, v) => s + v, 0);
+    if (Math.abs(actualTotal - totalInput) > 0.0001)
+      noteText = `※ 合計が希望量と異なります（実際の合計：${fmtNum(actualTotal)}${unit}）`;
+  }
+
+  const rowsEl = document.getElementById('result-rows');
+  rowsEl.innerHTML = '';
+  ingredients.forEach((ing, idx) => {
+    const row = document.createElement('div');
+    row.className = 'result-row';
+    const valStr = useNoneMode ? fmtNone(amounts[idx]) : fmtNum(amounts[idx]);
+    row.innerHTML = `<span class="result-name">${escHtml(ing.name)}</span><span class="result-value">${valStr}${escHtml(unit)}</span>`;
+    rowsEl.appendChild(row);
+  });
+
+  document.getElementById('result-total-value').textContent = `${fmtNum(actualTotal)}${unit}`;
+  document.getElementById('result-mode').textContent = `適用モード：${modeLabels[mode] || mode}`;
+  const noteEl = document.getElementById('result-note');
+  noteEl.textContent = noteText;
+  noteEl.style.display = noteText ? '' : 'none';
+
+  document.getElementById('calc-result').style.display = '';
+
+  // Enable copy/memo buttons now that result is visible
+  document.getElementById('btn-total-copy').disabled = false;
+  document.getElementById('btn-total-memo').disabled = false;
+}
+
+// ============================================================
+// Copy / Memo helpers
+// ============================================================
+
+function nowLabel() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `[${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}]`;
+}
+
+function tempBtnText(btn, text, restoreMs = 1500) {
+  const orig = btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = orig; }, restoreMs);
+}
+
+function appendToMemo(text) {
+  const recipe = recipes.find(r => r.id === calcRecipeId);
+  if (!recipe) return;
+  const ta = document.getElementById('calc-memo-textarea');
+  const cur = ta.value;
+  ta.value = cur ? cur + '\n\n' + text : text;
+  ta.style.height = 'auto';
+  ta.style.height = Math.max(80, ta.scrollHeight) + 'px';
+  recipe.memo = ta.value;
+  saveRecipes();
+  // update memo copy button state
+  document.getElementById('btn-memo-copy').disabled = !ta.value;
+}
+
+function getTotalResultText() {
+  const unit = document.getElementById('input-unit').value.trim() || '';
+  const rows  = [...document.querySelectorAll('#result-rows .result-row')];
+  return rows.map(r => {
+    const name = r.querySelector('.result-name').textContent;
+    const val  = r.querySelector('.result-value').textContent;
+    return `${name}: ${val}`;
+  }).join(' / ');
+}
+
+// Total-amount: copy button
+document.getElementById('btn-total-copy').disabled = true;
+document.getElementById('btn-total-copy').addEventListener('click', () => {
+  const text = getTotalResultText();
+  navigator.clipboard.writeText(text)
+    .then(() => tempBtnText(document.getElementById('btn-total-copy'), 'コピーしました'))
+    .catch(() => tempBtnText(document.getElementById('btn-total-copy'), 'コピー失敗'));
+});
+
+// Total-amount: memo output button
+document.getElementById('btn-total-memo').disabled = true;
+document.getElementById('btn-total-memo').addEventListener('click', () => {
+  const unit       = document.getElementById('input-unit').value.trim() || '';
+  const totalVal   = document.getElementById('result-total-value').textContent;
+  const resultLine = getTotalResultText();
+  const text = `${nowLabel()}\n希望の総量: ${totalVal}\n${resultLine}`;
+  appendToMemo(text);
+  tempBtnText(document.getElementById('btn-total-memo'), '出力しました');
+});
+
+// Memo copy button
+document.getElementById('btn-memo-copy').addEventListener('click', () => {
+  const ta = document.getElementById('calc-memo-textarea');
+  if (!ta.value) return;
+  navigator.clipboard.writeText(ta.value)
+    .then(() => tempBtnText(document.getElementById('btn-memo-copy'), 'コピーしました'))
+    .catch(() => tempBtnText(document.getElementById('btn-memo-copy'), 'コピー失敗'));
+});
+
+// ============================================================
+// Screen 4: Settings
+// ============================================================
+function renderSettings() {
+  const container = document.getElementById('settings-container');
+  container.innerHTML = '';
+  SETTINGS_CONFIG.forEach(catDef => {
+    const section = document.createElement('div');
+    section.className = 'settings-section';
+    const catLabel = document.createElement('div');
+    catLabel.className = 'settings-category';
+    catLabel.textContent = catDef.category;
+    section.appendChild(catLabel);
+    const card = document.createElement('div');
+    card.className = 'settings-card';
+    catDef.items.forEach(itemDef => {
+      const item = document.createElement('div');
+      item.className = 'settings-item';
+      if (itemDef.type === 'custom') {
+        if (itemDef.render) itemDef.render(item);
+      } else {
+        const lbl = document.createElement('span');
+        lbl.className = 'settings-item-label';
+        lbl.textContent = itemDef.label;
+        item.appendChild(lbl);
+        if (itemDef.type === 'toggle') {
+          item.removeChild(lbl);
+          const row = document.createElement('label');
+          row.className = 'settings-toggle-row';
+          const lblInline = document.createElement('span');
+          lblInline.className = 'settings-item-label';
+          lblInline.style.marginBottom = '0';
+          lblInline.textContent = itemDef.label;
+          row.appendChild(lblInline);
+          const sw = document.createElement('span');
+          sw.className = 'settings-toggle-sw';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = !!settings[itemDef.key];
+          cb.addEventListener('change', () => { settings[itemDef.key] = cb.checked; saveSettings(); showToast('設定を保存しました'); });
+          const slider = document.createElement('span');
+          slider.className = 'settings-toggle-slider';
+          sw.appendChild(cb); sw.appendChild(slider);
+          row.appendChild(sw);
+          item.appendChild(row);
+          if (itemDef.desc) {
+            const descEl = document.createElement('span');
+            descEl.className = 'settings-radio-desc';
+            descEl.style.display = 'block';
+            descEl.style.marginTop = '4px';
+            descEl.textContent = itemDef.desc;
+            item.appendChild(descEl);
+          }
+        } else if (itemDef.type === 'radio') {
+          const group = document.createElement('div');
+          group.className = 'settings-radio-group';
+          itemDef.options.forEach(opt => {
+            const lEl = document.createElement('label');
+            lEl.className = 'settings-radio-label';
+            const radio = document.createElement('input');
+            radio.type = 'radio'; radio.name = `sr-${itemDef.key}`; radio.value = opt.value;
+            if (settings[itemDef.key] === opt.value) radio.checked = true;
+            radio.addEventListener('change', () => { if (radio.checked) { settings[itemDef.key] = opt.value; saveSettings(); showToast('設定を保存しました'); } });
+            lEl.appendChild(radio);
+            const textWrap = document.createElement('span');
+            textWrap.className = 'settings-radio-text';
+            textWrap.appendChild(document.createTextNode(opt.label));
+            if (opt.desc) {
+              const descEl = document.createElement('span');
+              descEl.className = 'settings-radio-desc';
+              descEl.textContent = opt.desc;
+              textWrap.appendChild(descEl);
+            }
+            lEl.appendChild(textWrap);
+            group.appendChild(lEl);
+          });
+          item.appendChild(group);
+        }
+      }
+      card.appendChild(item);
+    });
+    section.appendChild(card);
+    container.appendChild(section);
+  });
+}
+
+document.getElementById('btn-reset-settings').addEventListener('click', () => {
+  showConfirm('すべての設定をデフォルトに戻しますか？', '設定をリセット', 'リセット', false).then(ok => {
+    if (!ok) return;
+    settings = {};
+    SETTINGS_CONFIG.forEach(cat => cat.items.forEach(item => {
+      if (item.key && item.default !== undefined) settings[item.key] = item.default;
+    }));
+    saveSettings(); renderSettings(); showToast('設定をリセットしました');
+  });
+});
+
+// ============================================================
+// Utilities
+// ============================================================
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escAttr(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ============================================================
+// Color utility functions
+// ============================================================
+function hslToRgb(h, s, l) {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => { const k = (n + h / 30) % 12; return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+  return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+}
+function hexToHsl(hex) {
+  if (!hex || hex.length < 7) return { h: 0, s: 100, l: 50 };
+  const r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let h = 0, s = 0; const l = (max+min)/2;
+  if (max !== min) {
+    const d = max-min;
+    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max) {
+      case r: h = ((g-b)/d + (g<b?6:0)) * 60; break;
+      case g: h = ((b-r)/d + 2) * 60; break;
+      case b: h = ((r-g)/d + 4) * 60; break;
+    }
+  }
+  return { h: Math.round(h), s: Math.round(s*100), l: Math.round(l*100) };
+}
+function hslToHex(h, s, l) {
+  const [r,g,b] = hslToRgb(h,s,l);
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+}
+function getTextColor(hexColor) {
+  if (!hexColor || hexColor.length < 7) return '#ffffff';
+  const r = parseInt(hexColor.slice(1,3),16)/255, g = parseInt(hexColor.slice(3,5),16)/255, b = parseInt(hexColor.slice(5,7),16)/255;
+  return (0.2126*r + 0.7152*g + 0.0722*b) > 0.55 ? '#222222' : '#ffffff';
+}
+function getTextShadow(hexColor) {
+  return getTextColor(hexColor) === '#ffffff'
+    ? '0 1px 2px rgba(0,0,0,0.4)'
+    : '0 1px 1px rgba(255,255,255,0.6)';
+}
+function getTagBorderColor(hexColor) {
+  if (!hexColor || hexColor.length < 7) return 'rgba(0,0,0,0.2)';
+  const r = parseInt(hexColor.slice(1,3),16);
+  const g = parseInt(hexColor.slice(3,5),16);
+  const b = parseInt(hexColor.slice(5,7),16);
+  const d = v => Math.max(0, Math.floor(v * 0.65));
+  return `rgb(${d(r)},${d(g)},${d(b)})`;
+}
+
+// ============================================================
+// Canvas Color Picker
+// ============================================================
+let _cpH = 0, _cpS = 100, _cpL = 50;
+let _cpPickerOpen = false;
+let _cpInited     = false;
+
+function cpDraw2D() {
+  const canvas = document.getElementById('cp-canvas-2d');
+  if (!canvas) return;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(W, H);
+  const d = img.data;
+  for (let y = 0; y < H; y++) {
+    const sat = (1 - y/(H-1)) * 100;
+    for (let x = 0; x < W; x++) {
+      const [r,g,b] = hslToRgb((x/(W-1))*360, sat, _cpL);
+      const i = (y*W+x)*4; d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  // Cursor
+  const cx = (_cpH/360)*W, cy = (1-_cpS/100)*H;
+  ctx.beginPath(); ctx.arc(cx,cy,8,0,Math.PI*2); ctx.strokeStyle='white'; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,8,0,Math.PI*2); ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1; ctx.stroke();
+}
+function cpDrawBright() {
+  const canvas = document.getElementById('cp-canvas-bright');
+  if (!canvas) return;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(W, H);
+  const d = img.data;
+  for (let y = 0; y < H; y++) {
+    const [r,g,b] = hslToRgb(_cpH, _cpS, (1-y/(H-1))*100);
+    for (let x = 0; x < W; x++) {
+      const i = (y*W+x)*4; d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const thumbY = (1-_cpL/100)*H;
+  ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillRect(-1,thumbY-3,W+2,6);
+  ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1; ctx.strokeRect(-1,thumbY-3,W+2,6);
+}
+function cpUpdatePreview() {
+  const hex = hslToHex(_cpH, _cpS, _cpL);
+  tagModalSelectedColor = hex;
+  document.getElementById('input-tag-color').value = hex;
+  const prev = document.getElementById('cp-preview');
+  const sel  = document.getElementById('cp-selected-preview');
+  const hexEl = document.getElementById('cp-hex');
+  if (prev)  { prev.style.background = hex; prev.style.borderColor = getTagBorderColor(hex); }
+  if (sel)   { sel.style.background = hex;  sel.style.borderColor  = getTagBorderColor(hex); }
+  if (hexEl) hexEl.textContent = hex;
+  renderTagColorPresets();
+}
+function cpUpdate() { cpDraw2D(); cpDrawBright(); cpUpdatePreview(); }
+function cpSetFromHex(hex) {
+  const { h, s, l } = hexToHsl(hex);
+  _cpH = h; _cpS = s; _cpL = l;
+  cpUpdate();
+}
+function cpInit() {
+  if (_cpInited) return;
+  _cpInited = true;
+  const canvas2d = document.getElementById('cp-canvas-2d');
+  const canvasBr = document.getElementById('cp-canvas-bright');
+  if (!canvas2d || !canvasBr) return;
+
+  let drag2d = false, dragBr = false;
+
+  function on2D(e) {
+    const rect = canvas2d.getBoundingClientRect();
+    _cpH = Math.round(Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width))*360);
+    _cpS = Math.round((1-Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height)))*100);
+    cpUpdate();
+  }
+  function onBr(e) {
+    const rect = canvasBr.getBoundingClientRect();
+    _cpL = Math.round((1-Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height)))*100);
+    cpUpdate();
+  }
+
+  canvas2d.addEventListener('mousedown', e => { drag2d=true; on2D(e); });
+  canvas2d.addEventListener('touchstart', e => { e.preventDefault(); on2D(e.touches[0]); }, {passive:false});
+  canvas2d.addEventListener('touchmove',  e => { e.preventDefault(); on2D(e.touches[0]); }, {passive:false});
+
+  canvasBr.addEventListener('mousedown', e => { dragBr=true; onBr(e); });
+  canvasBr.addEventListener('touchstart', e => { e.preventDefault(); onBr(e.touches[0]); }, {passive:false});
+  canvasBr.addEventListener('touchmove',  e => { e.preventDefault(); onBr(e.touches[0]); }, {passive:false});
+
+  document.addEventListener('mousemove', e => { if (drag2d) on2D(e); if (dragBr) onBr(e); });
+  document.addEventListener('mouseup',   () => { drag2d=false; dragBr=false; });
+}
+
+document.getElementById('btn-custom-color').addEventListener('click', () => {
+  _cpPickerOpen = !_cpPickerOpen;
+  const picker = document.getElementById('custom-color-picker');
+  const btn = document.getElementById('btn-custom-color');
+  picker.style.display = _cpPickerOpen ? '' : 'none';
+  btn.style.background = _cpPickerOpen ? '#ebf4ff' : '';
+  btn.style.borderColor = _cpPickerOpen ? '#4A90D9' : '';
+  if (_cpPickerOpen) { cpSetFromHex(tagModalSelectedColor); cpInit(); }
+});
+
+function fmtNum(n) {
+  if (Number.isInteger(n)) return String(n);
+  return parseFloat(n.toFixed(4)).toString();
+}
+
+function fmtNone(n) {
+  // Truncate to 3 decimal places (no rounding)
+  const truncated = Math.trunc(n * 1000) / 1000;
+  // Check if digits exist beyond 3 decimal places
+  const hasMore = Math.abs(n - truncated) > 1e-9;
+  // Format: remove trailing zeros after decimal
+  let str;
+  if (Number.isInteger(truncated)) {
+    str = String(truncated);
+  } else {
+    str = truncated.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+  }
+  return hasMore ? str + '…' : str;
+}
+
+function showError(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.classList.add('show'); }
+function hideError(id)      { document.getElementById(id).classList.remove('show'); }
+
+// ============================================================
+// Custom confirm / alert (replaces native confirm/alert for UI consistency)
+// ============================================================
+(function() {
+  const modal   = document.getElementById('modal-confirm');
+  const okBtn   = document.getElementById('btn-confirm-ok');
+  const canBtn  = document.getElementById('btn-confirm-cancel');
+  let _resolve = null;
+
+  function close() { modal.classList.add('hidden'); _resolve = null; }
+  okBtn.addEventListener('click',  () => { const r = _resolve; close(); if (r) r(true);  });
+  canBtn.addEventListener('click', () => { const r = _resolve; close(); if (r) r(false); });
+  modal.addEventListener('click', (e) => { if (e.target === modal) { const r = _resolve; close(); if (r) r(false); } });
+
+  window.showConfirm = function(msg, title = '確認', okLabel = '実行', danger = true) {
+    document.getElementById('modal-confirm-title').textContent = title;
+    document.getElementById('modal-confirm-msg').textContent = msg;
+    okBtn.textContent = okLabel;
+    okBtn.className = 'btn ' + (danger ? 'btn-danger' : 'btn-primary');
+    modal.classList.remove('hidden');
+    return new Promise(res => { _resolve = res; });
+  };
+})();
+
+(function() {
+  const modal  = document.getElementById('modal-alert');
+  const okBtn  = document.getElementById('btn-alert-ok');
+  let _resolve = null;
+
+  function close() { modal.classList.add('hidden'); _resolve = null; }
+  okBtn.addEventListener('click', () => { const r = _resolve; close(); if (r) r(); });
+  modal.addEventListener('click', (e) => { if (e.target === modal) { const r = _resolve; close(); if (r) r(); } });
+
+  window.showAlert = function(msg, title = 'お知らせ') {
+    document.getElementById('modal-alert-title').textContent = title;
+    document.getElementById('modal-alert-msg').textContent = msg;
+    modal.classList.remove('hidden');
+    return new Promise(res => { _resolve = res; });
+  };
+})();
+
+document.getElementById('btn-calc-home').addEventListener('click', () => {
+  currentFolderView = null;
+  historyStack = ['list'];
+  renderRecipeList();
+  showScreen('list', false);
+});
+
+// ============================================================
+// Init
+// ============================================================
+loadData();
+renderSettings();
+if (settings.lastRecipe && settings.lastOpenedRecipeId) {
+  const lastR = recipes.find(r => r.id === settings.lastOpenedRecipeId);
+  if (lastR) { openCalcScreen(settings.lastOpenedRecipeId); }
+  else        { renderRecipeList(); }
+} else {
+  renderRecipeList();
+}
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('SW registered:', reg.scope))
+        .catch(err => console.log('SW registration failed:', err));
+    });
+  }
+</script>
+</body>
+</html>
