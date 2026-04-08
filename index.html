@@ -4421,9 +4421,7 @@ function addIngredientRow(name = '', ratio = '') {
   container.appendChild(row);
   const nameInp2 = row.querySelector('.ingredient-name');
   attachIMEGuard(nameInp2, null);
-  nameInp2.addEventListener('focus', () => focusScrollIntoView(nameInp2));
   const ratioInp = row.querySelector('.ingredient-ratio');
-  ratioInp.addEventListener('focus', () => focusScrollIntoView(ratioInp));
   ratioInp.addEventListener('input', () => {
     document.getElementById('btn-normalize-ratio').disabled = false;
   });
@@ -4547,7 +4545,6 @@ attachIMEGuard(document.getElementById('input-recipe-name'), null);
   inp.addEventListener('compositionstart', () => { isSearchComposing = true; });
   inp.addEventListener('compositionend',   () => { isSearchComposing = false; applySearch(); });
   inp.addEventListener('input', () => { if (!isSearchComposing) applySearch(); });
-  inp.addEventListener('focus', () => focusScrollIntoView(inp));
 
   clr.addEventListener('click', () => {
     inp.value = '';
@@ -4718,7 +4715,7 @@ function renderCalcIngredientSets(recipe) {
       inp.min = '0';
       inp.dataset.ingIdx = ingIdx;
       inp.value = set.values[ingIdx] || '';
-      inp.addEventListener('focus', () => { set.activeInputIdx = ingIdx; focusScrollIntoView(inp); });
+      inp.addEventListener('focus', () => { set.activeInputIdx = ingIdx; });
       inp.addEventListener('input', () => {
         set.values[ingIdx] = inp.value;
         set.lastEditedIdx = inp.value ? ingIdx : null;
@@ -4911,13 +4908,10 @@ function renderSavedAmounts(recipe) {
 }
 
 document.getElementById('input-total-amount').addEventListener('input', calculate);
-document.getElementById('input-total-amount').addEventListener('focus', function() { focusScrollIntoView(this); });
 document.getElementById('input-unit').addEventListener('input', () => {
   calculate();
 });
-document.getElementById('input-unit').addEventListener('focus', function() { focusScrollIntoView(this); });
 attachIMEGuard(document.getElementById('input-unit'), null);
-document.getElementById('calc-memo-textarea').addEventListener('focus', function() { focusScrollIntoView(this); });
 
 function calculate() {
   const recipe = recipes.find(r => r.id === calcRecipeId);
