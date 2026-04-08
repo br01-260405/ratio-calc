@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-visual">
 <title>比率計算アプリ</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="assets/icons/colon-icon-32.svg">
@@ -82,6 +82,23 @@
   }
   .btn-back:hover, .btn-settings:hover { background: rgba(255,255,255,0.15); }
   .btn-settings { font-size: 20px; }
+  .btn-sort {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .btn-sort:hover { background: rgba(255,255,255,0.15); }
+  .btn-sort.sort-active { background: rgba(255,255,255,0.28); }
 
   .screen {
     display: none;
@@ -1270,6 +1287,21 @@
     z-index: 400;
   }
 
+  /* ===== List sort mode (recipe/folder float+swap) ===== */
+  .recipe-card.list-sort-dragging,
+  .folder-card.list-sort-dragging { opacity: 0.4; }
+  .list-sort-float-card {
+    position: fixed;
+    z-index: 400;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    transform: scale(1.02);
+    opacity: 0.97;
+    border-radius: 12px;
+    box-sizing: border-box;
+    margin: 0 !important;
+  }
+
   /* ===== Result action buttons ===== */
   .result-action-row {
     display: flex;
@@ -1422,6 +1454,7 @@
     </div>
     <div class="header-title" id="header-title">比率計算アプリ</div>
     <div class="header-right">
+      <button class="btn-sort" id="btn-sort" style="display:none" aria-label="並び替え">⇅</button>
       <button class="btn-settings" id="btn-settings" aria-label="設定">⚙</button>
     </div>
   </header>
@@ -1903,6 +1936,8 @@ function showScreen(name, push = true) {
   }
   btnBack.style.display = historyStack.length > 1 ? '' : 'none';
   btnSettingsHeader.style.display = name === 'settings' ? 'none' : '';
+  const _btnSort = document.getElementById('btn-sort');
+  if (_btnSort) _btnSort.style.display = (name === 'list' || name === 'folder-view') ? '' : 'none';
   updateHeaderTitle(name);
 }
 
@@ -1923,6 +1958,8 @@ function clearTagSortMode() {
     if (ov) ov.remove();
     const bar = document.getElementById('tag-filter-bar');
     if (bar) bar.classList.remove('sort-active');
+    const btnSort = document.getElementById('btn-sort');
+    if (btnSort) { btnSort.textContent = '⇅'; btnSort.classList.remove('sort-active'); }
   }
 }
 
@@ -1948,6 +1985,24 @@ function goBack() {
 }
 
 btnBack.addEventListener('click', goBack);
+
+// Sort button (header) — unified sort mode for tags, recipes and folders
+const btnSortHeader = document.getElementById('btn-sort');
+btnSortHeader.addEventListener('click', () => {
+  tagSortMode = !tagSortMode;
+  btnSortHeader.textContent = tagSortMode ? '✓ 完了' : '⇅';
+  btnSortHeader.classList.toggle('sort-active', tagSortMode);
+  renderTagFilterBar();
+  renderRecipeList();
+});
+
+// Android hardware back button
+history.pushState(null, '', '');
+window.addEventListener('popstate', () => {
+  goBack();
+  history.pushState(null, '', '');
+});
+
 btnSettingsHeader.addEventListener('click', () => {
   renderSettings();
   showScreen('settings');
@@ -2070,20 +2125,6 @@ function renderTagFilterBar() {
   titleSpan.textContent = 'タグで絞り込み';
   btnRow.appendChild(titleSpan);
   if (!tagSortMode) btnRow.appendChild(makeOrAndToggle());
-  const sortBtn = document.createElement('button');
-  sortBtn.className = 'btn-tag-sort' + (tagSortMode ? ' done' : '');
-  sortBtn.textContent = tagSortMode ? '完了' : '並べ替え';
-  sortBtn.addEventListener('click', () => {
-    tagSortMode = !tagSortMode;
-    if (!tagSortMode) {
-      const ov = document.getElementById('tag-sort-overlay');
-      if (ov) ov.remove();
-      bar.classList.remove('sort-active');
-    }
-    renderTagFilterBar();
-    if (!tagSortMode && currentFolderView === null) renderRecipeList();
-  });
-  btnRow.appendChild(sortBtn);
   outer.appendChild(btnRow);
 
   if (contextTags !== null) {
@@ -2291,7 +2332,7 @@ function startTagSortDrag(chip, tag, group, startX, startY) {
     const target = el ? el.closest('.filter-chip.sort-draggable') : null;
     if (target && target !== chip && target.dataset.groupLabel === group.label) {
       const targetRect = target.getBoundingClientRect();
-      const insertBefore = cx < targetRect.left + targetRect.width / 2;
+      const insertBefore = cx < targetRect.left + targetRect.width * 0.75;
       if (insertBefore) {
         target.parentNode.insertBefore(ph, target);
       } else {
@@ -3247,7 +3288,6 @@ function renderFolderCards(container) {
     card.className = 'folder-card';
     card.dataset.folderId = folder.id;
     card.innerHTML = `
-      <div class="drag-handle" aria-label="並べ替え" title="ドラッグして並べ替え">≡</div>
       <div class="folder-icon">📁</div>
       <div class="folder-info">
         <div class="folder-name">${escHtml(folder.name)}</div>
@@ -3291,50 +3331,22 @@ function renderFolderCards(container) {
         checkedRecipeIds.clear(); checkedFolderIds.clear();
         checkedFolderIds.add(folder.id);
         renderRecipeList();
-      }, '.drag-handle, .btn-folder-menu');
+      }, '.btn-recipe-menu');
     }
 
-    const handle = card.querySelector('.drag-handle');
-    if (!bulkEditMode) {
-      handle.setAttribute('draggable', 'true');
-      handle.addEventListener('dragstart', (e) => {
-        dragSrcId   = folder.id;
-        dragSrcType = 'folder';
-        e.dataTransfer.setData('text/plain', folder.id);
-        e.dataTransfer.effectAllowed = 'move';
-        try { e.dataTransfer.setDragImage(card, 30, 20); } catch (_) {}
-        setTimeout(() => card.classList.add('dragging'), 0);
-      });
-      handle.addEventListener('dragend', () => {
-        card.classList.remove('dragging');
-        clearDropIndicators();
-        dragSrcId = dragSrcType = null;
-      });
-      card.addEventListener('dragover', (e) => {
+    if (tagSortMode && !bulkEditMode) {
+      card.style.cursor = 'grab';
+      card.style.userSelect = 'none';
+      card.style.touchAction = 'none';
+      card.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.btn-recipe-menu, .bulk-checkbox-wrap')) return;
         e.preventDefault();
-        if (!dragSrcId || dragSrcId === folder.id || dragSrcType !== 'folder') return;
-        clearDropIndicators();
-        const rect = card.getBoundingClientRect();
-        card.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drag-over-top' : 'drag-over-bottom');
+        startListSortDrag(card, 'folder', folder.id, e.clientX, e.clientY);
       });
-      card.addEventListener('dragleave', (e) => {
-        if (!card.contains(e.relatedTarget)) card.classList.remove('drag-over-top', 'drag-over-bottom');
-      });
-      card.addEventListener('drop', (e) => {
-        e.preventDefault();
-        if (!dragSrcId || dragSrcId === folder.id || dragSrcType !== 'folder') { clearDropIndicators(); return; }
-        const before = card.classList.contains('drag-over-top');
-        clearDropIndicators();
-        reorderFolders(dragSrcId, folder.id, before);
-      });
-      handle.addEventListener('touchstart', () => {
-        touchDragSrcId   = folder.id;
-        touchDragSrcType = 'folder';
-        touchDragCard    = card;
-        card.classList.add('dragging');
-        document.addEventListener('touchmove',   onTouchMove,   { passive: false });
-        document.addEventListener('touchend',    onTouchEnd);
-        document.addEventListener('touchcancel', onTouchEnd);
+      card.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.btn-recipe-menu, .bulk-checkbox-wrap')) return;
+        const t = e.touches[0];
+        startListSortDrag(card, 'folder', folder.id, t.clientX, t.clientY);
       }, { passive: true });
     }
 
@@ -3370,7 +3382,6 @@ function renderRecipeCards(container, sortedRecipes) {
       : '';
 
     card.innerHTML = `
-      <div class="drag-handle" aria-label="並べ替え" title="ドラッグして並べ替え">≡</div>
       <div class="recipe-info" data-id="${recipe.id}">
         <div class="recipe-name">${escHtml(recipe.name)}</div>
         <div class="recipe-summary">${escHtml(summary)}</div>
@@ -3406,7 +3417,7 @@ function renderRecipeCards(container, sortedRecipes) {
         checkedRecipeIds.clear(); checkedFolderIds.clear();
         checkedRecipeIds.add(recipe.id);
         renderRecipeList();
-      }, '.drag-handle, .btn-recipe-menu');
+      }, '.btn-recipe-menu');
     }
 
     list.appendChild(card);
@@ -3423,50 +3434,25 @@ function renderRecipeCards(container, sortedRecipes) {
 
   if (bulkEditMode) return;
 
-  // Desktop DnD
-  container.querySelectorAll('.recipe-card').forEach(card => {
-    const handle = card.querySelector('.drag-handle');
-    const id = card.dataset.id;
-    handle.setAttribute('draggable', 'true');
-    handle.addEventListener('dragstart', (e) => {
-      dragSrcId = id; dragSrcType = 'recipe';
-      e.dataTransfer.setData('text/plain', id);
-      e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setDragImage(card, 30, 20); } catch (_) {}
-      setTimeout(() => card.classList.add('dragging'), 0);
+  // Sort mode: float+swap drag behavior
+  if (tagSortMode) {
+    container.querySelectorAll('.recipe-card').forEach(card => {
+      const id = card.dataset.id;
+      card.style.cursor = 'grab';
+      card.style.userSelect = 'none';
+      card.style.touchAction = 'none';
+      card.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.btn-recipe-menu, .bulk-checkbox-wrap')) return;
+        e.preventDefault();
+        startListSortDrag(card, 'recipe', id, e.clientX, e.clientY);
+      });
+      card.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.btn-recipe-menu, .bulk-checkbox-wrap')) return;
+        const t = e.touches[0];
+        startListSortDrag(card, 'recipe', id, t.clientX, t.clientY);
+      }, { passive: true });
     });
-    handle.addEventListener('dragend', () => {
-      card.classList.remove('dragging');
-      clearDropIndicators();
-      dragSrcId = dragSrcType = null;
-    });
-    card.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (!dragSrcId || dragSrcId === id || dragSrcType !== 'recipe') return;
-      clearDropIndicators();
-      const rect = card.getBoundingClientRect();
-      card.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drag-over-top' : 'drag-over-bottom');
-    });
-    card.addEventListener('dragleave', (e) => {
-      if (!card.contains(e.relatedTarget)) card.classList.remove('drag-over-top', 'drag-over-bottom');
-    });
-    card.addEventListener('drop', (e) => {
-      e.preventDefault();
-      if (!dragSrcId || dragSrcId === id || dragSrcType !== 'recipe') { clearDropIndicators(); return; }
-      const before = card.classList.contains('drag-over-top');
-      clearDropIndicators();
-      reorderRecipes(dragSrcId, id, before);
-    });
-
-    handle.addEventListener('touchstart', () => {
-      touchDragSrcId = id; touchDragSrcType = 'recipe';
-      touchDragCard = card;
-      card.classList.add('dragging');
-      document.addEventListener('touchmove',   onTouchMove,   { passive: false });
-      document.addEventListener('touchend',    onTouchEnd);
-      document.addEventListener('touchcancel', onTouchEnd);
-    }, { passive: true });
-  });
+  }
 }
 
 // ============================================================
@@ -3477,55 +3463,6 @@ function clearDropIndicators() {
     c.classList.remove('drag-over-top', 'drag-over-bottom');
   });
 }
-
-function onTouchMove(e) {
-  if (!touchDragSrcId) return;
-  e.preventDefault();
-  const touch = e.touches[0];
-  const el = document.elementFromPoint(touch.clientX, touch.clientY);
-  clearDropIndicators();
-
-  const selector = touchDragSrcType === 'folder' ? '.folder-card' : '.recipe-card';
-  const idAttr   = touchDragSrcType === 'folder' ? 'folderId'     : 'id';
-
-  const target = el ? el.closest(selector) : null;
-  if (target && target.dataset[idAttr] !== touchDragSrcId) {
-    const rect = target.getBoundingClientRect();
-    target.classList.add(touch.clientY < rect.top + rect.height / 2 ? 'drag-over-top' : 'drag-over-bottom');
-  }
-}
-
-function onTouchEnd(e) {
-  document.removeEventListener('touchmove',   onTouchMove);
-  document.removeEventListener('touchend',    onTouchEnd);
-  document.removeEventListener('touchcancel', onTouchEnd);
-  if (!touchDragSrcId) return;
-
-  const touch = e.changedTouches[0];
-  const el    = document.elementFromPoint(touch.clientX, touch.clientY);
-
-  const selector = touchDragSrcType === 'folder' ? '.folder-card' : '.recipe-card';
-  const idAttr   = touchDragSrcType === 'folder' ? 'folderId'     : 'id';
-
-  const target = el ? el.closest(selector) : null;
-
-  if (target && target.dataset[idAttr] && target.dataset[idAttr] !== touchDragSrcId) {
-    const before = target.classList.contains('drag-over-top');
-    clearDropIndicators();
-    if (touchDragCard) touchDragCard.classList.remove('dragging');
-    if (touchDragSrcType === 'folder') {
-      reorderFolders(touchDragSrcId, target.dataset[idAttr], before);
-    } else {
-      reorderRecipes(touchDragSrcId, target.dataset[idAttr], before);
-    }
-  } else {
-    clearDropIndicators();
-    if (touchDragCard) touchDragCard.classList.remove('dragging');
-  }
-
-  touchDragSrcId = touchDragSrcType = touchDragCard = null;
-}
-
 
 function reorderRecipes(srcId, targetId, insertBefore) {
   const sorted = [...recipes].sort((a, b) => a.order - b.order);
@@ -3555,6 +3492,117 @@ function reorderFolders(srcId, targetId, insertBefore) {
   saveFolders();
   renderRecipeList();
   showToast('順序を変更しました');
+}
+
+// ============================================================
+// List sort: float+swap drag for recipe/folder cards
+// ============================================================
+function startListSortDrag(card, type, id, startX, startY) {
+  const rect = card.getBoundingClientRect();
+  const offsetX = startX - rect.left;
+  const offsetY = startY - rect.top;
+
+  // Floating clone
+  const floatEl = card.cloneNode(true);
+  floatEl.className = floatEl.className + ' list-sort-float-card';
+  floatEl.style.left   = rect.left + 'px';
+  floatEl.style.top    = rect.top  + 'px';
+  floatEl.style.width  = rect.width  + 'px';
+  floatEl.style.height = rect.height + 'px';
+  document.body.appendChild(floatEl);
+
+  // Placeholder (invisible, same height)
+  const ph = document.createElement('div');
+  ph.dataset.sortPlaceholder = 'true';
+  ph.style.cssText = `height:${rect.height}px;visibility:hidden;flex-shrink:0;`;
+  card.parentNode.insertBefore(ph, card);
+  card.classList.add('list-sort-dragging');
+
+  function onMove(clientX, clientY) {
+    const newLeft = clientX - offsetX;
+    const newTop  = clientY - offsetY;
+    floatEl.style.left = newLeft + 'px';
+    floatEl.style.top  = newTop  + 'px';
+
+    const cy = newTop + rect.height / 2;
+
+    floatEl.style.display = 'none';
+    const el = document.elementFromPoint(clientX, cy);
+    floatEl.style.display = '';
+
+    const selector = type === 'recipe'
+      ? '.recipe-card:not(.list-sort-dragging)'
+      : '.folder-card:not(.list-sort-dragging)';
+    const target = el ? el.closest(selector) : null;
+
+    if (target && !target.dataset.sortPlaceholder) {
+      const targetRect = target.getBoundingClientRect();
+      // 75% threshold: easier to swap, especially for last→first
+      const insertBefore = cy < targetRect.top + targetRect.height * 0.75;
+      if (insertBefore) {
+        target.parentNode.insertBefore(ph, target);
+      } else {
+        target.parentNode.insertBefore(ph, target.nextSibling);
+      }
+    }
+  }
+
+  function finish() {
+    document.removeEventListener('mousemove', onMM);
+    document.removeEventListener('mouseup',   onMU);
+    document.removeEventListener('touchmove', onTM);
+    document.removeEventListener('touchend',  onTE);
+    document.removeEventListener('touchcancel', onTE);
+
+    floatEl.remove();
+    card.classList.remove('list-sort-dragging');
+
+    const phParent = ph.parentNode;
+    if (!phParent) { ph.remove(); return; }
+
+    const allCards = [...phParent.querySelectorAll(
+      type === 'recipe' ? '.recipe-card' : '.folder-card'
+    )];
+
+    const newOrderIds = [];
+    allCards.forEach(el => {
+      if (el.dataset.sortPlaceholder) {
+        newOrderIds.push(id);
+      } else {
+        const elId = type === 'recipe' ? el.dataset.id : el.dataset.folderId;
+        if (elId) newOrderIds.push(elId);
+      }
+    });
+    if (!newOrderIds.includes(id)) newOrderIds.push(id);
+
+    ph.remove();
+
+    if (type === 'recipe') {
+      newOrderIds.forEach((rid, i) => {
+        const r = recipes.find(r => r.id === rid);
+        if (r) r.order = i;
+      });
+      saveRecipes();
+    } else {
+      newOrderIds.forEach((fid, i) => {
+        const f = folders.find(f => f.id === fid);
+        if (f) f.order = i;
+      });
+      saveFolders();
+    }
+    showToast('順序を変更しました');
+  }
+
+  function onMM(e) { onMove(e.clientX, e.clientY); }
+  function onMU()  { finish(); }
+  function onTM(e) { e.preventDefault(); const t = e.touches[0]; onMove(t.clientX, t.clientY); }
+  function onTE()  { finish(); }
+
+  document.addEventListener('mousemove', onMM);
+  document.addEventListener('mouseup',   onMU);
+  document.addEventListener('touchmove', onTM, { passive: false });
+  document.addEventListener('touchend',  onTE);
+  document.addEventListener('touchcancel', onTE);
 }
 
 // ============================================================
@@ -4671,7 +4719,6 @@ function renderCalcIngredientSets(recipe) {
       inp.dataset.ingIdx = ingIdx;
       inp.value = set.values[ingIdx] || '';
       inp.addEventListener('focus', () => { set.activeInputIdx = ingIdx; focusScrollIntoView(inp); });
-      inp.addEventListener('blur',  () => { set.activeInputIdx = null; });
       inp.addEventListener('input', () => {
         set.values[ingIdx] = inp.value;
         set.lastEditedIdx = inp.value ? ingIdx : null;
