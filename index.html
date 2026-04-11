@@ -5336,9 +5336,16 @@ document.getElementById('btn-custom-color').addEventListener('click', () => {
   if (_cpPickerOpen) { cpSetFromHex(tagModalSelectedColor); cpInit(); }
 });
 
+// Add thousand separators to an integer string (e.g. "100000" → "100,000")
+function addThousandSep(s) {
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
 function fmtNum(n) {
-  if (Number.isInteger(n)) return String(n);
-  return parseFloat(n.toFixed(4)).toString();
+  if (Number.isInteger(n)) return addThousandSep(String(n));
+  const s = parseFloat(n.toFixed(4)).toString();
+  const [int, dec] = s.split('.');
+  return addThousandSep(int) + '.' + dec;
 }
 
 function fmtNone(n) {
@@ -5346,12 +5353,14 @@ function fmtNone(n) {
   const truncated = Math.trunc(n * 1000) / 1000;
   // Check if digits exist beyond 3 decimal places
   const hasMore = Math.abs(n - truncated) > 1e-9;
-  // Format: remove trailing zeros after decimal
+  // Format: remove trailing zeros after decimal, add thousand separators to integer part
   let str;
   if (Number.isInteger(truncated)) {
-    str = String(truncated);
+    str = addThousandSep(String(truncated));
   } else {
-    str = truncated.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+    const raw = truncated.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+    const [int, dec] = raw.split('.');
+    str = dec ? addThousandSep(int) + '.' + dec : addThousandSep(int);
   }
   return hasMore ? str + '…' : str;
 }
