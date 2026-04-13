@@ -1097,6 +1097,32 @@
     flex-shrink: 0;
   }
   .calc-ing-input { width: 88px; flex-shrink: 0; }
+  /* Per-ingredient tint — always visible, persists after +10 press */
+  .calc-ing-input[data-tint="0"] { background: #ebf8ff; border-color: #90cdf4; }
+  .calc-ing-input[data-tint="1"] { background: #fff5f5; border-color: #feb2b2; }
+  .calc-ing-input[data-tint="2"] { background: #fefce8; border-color: #fcd34d; }
+  .calc-ing-input[data-tint="3"] { background: #f0fff4; border-color: #9ae6b4; }
+  .calc-ing-input[data-tint="4"] { background: #faf5ff; border-color: #d6bcfa; }
+  .calc-ing-input--active { outline: 2.5px solid #4A90D9; outline-offset: 1px; }
+  /* Floating +10/+50/+100 toolbar fixed above keyboard */
+  #calc-floating-toolbar {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    bottom: 0;
+    background: #fff;
+    border-top: 2px solid #e2e8f0;
+    padding: 6px 10px;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.1);
+    z-index: 500;
+    display: none;
+    gap: 6px;
+    align-items: center;
+    box-sizing: border-box;
+  }
+  #calc-floating-toolbar .btn-amount { flex: 1; min-height: 40px; font-size: 14px; padding: 4px 2px; }
   .calc-ing-results {
     font-size: 13px;
     color: #4a5568;
@@ -1539,6 +1565,14 @@
     </div>
   </div>
 
+  <!-- Floating calc toolbar (fixed above keyboard) -->
+  <div id="calc-floating-toolbar">
+    <button class="btn-amount" type="button" data-toolbar-delta="10">+10</button>
+    <button class="btn-amount" type="button" data-toolbar-delta="50">+50</button>
+    <button class="btn-amount" type="button" data-toolbar-delta="100">+100</button>
+    <button class="btn-amount btn-amount-reset" type="button" data-toolbar-delta="0">リセット</button>
+  </div>
+
   <!-- Bulk Action Bar -->
   <div id="bulk-action-bar">
     <div class="bulk-bar-actions">
@@ -1828,6 +1862,10 @@ let isComposing        = false;
 let isSearchComposing  = false;
 let searchQuery        = '';
 
+// Calc floating toolbar
+let activeCalcSetRef = null;  // { set, setDiv, recipe }
+let _calcVVCleanup   = null;
+
 // Drag & Drop
 let dragSrcId        = null;
 let dragSrcType      = null;
@@ -1965,6 +2003,7 @@ function clearTagSortMode() {
 
 function goBack() {
   if (historyStack.length <= 1) return;
+  if (_calcVVCleanup) { _calcVVCleanup(); _calcVVCleanup = null; }
   clearTagSortMode();
   clearBulkEditState();
   historyStack.pop();
@@ -4624,6 +4663,31 @@ function openCalcScreen(recipeId) {
   renderCalcIngredientSets(recipe);
   renderSavedAmounts(recipe);
 
+  // Floating toolbar: show above keyboard when it appears
+  if (_calcVVCleanup) { _calcVVCleanup(); _calcVVCleanup = null; }
+  activeCalcSetRef = null;
+  const _ftbar = document.getElementById('calc-floating-toolbar');
+  _ftbar.style.display = 'none';
+  if (window.visualViewport) {
+    const onVV = () => {
+      const vv = window.visualViewport;
+      const kbH = window.innerHeight - vv.height - vv.offsetTop;
+      if (kbH > 80) {
+        _ftbar.style.bottom = kbH + 'px';
+        _ftbar.style.display = 'flex';
+      } else {
+        _ftbar.style.display = 'none';
+      }
+    };
+    window.visualViewport.addEventListener('resize', onVV);
+    window.visualViewport.addEventListener('scroll', onVV);
+    _calcVVCleanup = () => {
+      window.visualViewport.removeEventListener('resize', onVV);
+      window.visualViewport.removeEventListener('scroll', onVV);
+      _ftbar.style.display = 'none';
+    };
+  }
+
   // Calc screen memo
   const calcMemoTA = document.getElementById('calc-memo-textarea');
   calcMemoTA.value = recipe.memo || '';
@@ -4677,6 +4741,12 @@ function removeCalcIngredientSet(setId) {
   renderCalcIngredientSets(recipe);
 }
 
+function highlightActiveInput(setDiv, idx) {
+  setDiv.querySelectorAll('.calc-ing-input').forEach((inp, i) => {
+    inp.classList.toggle('calc-ing-input--active', idx !== null && i === idx);
+  });
+}
+
 function renderCalcIngredientSets(recipe) {
   const container = document.getElementById('calc-ingredient-sets');
   if (!container || !recipe) return;
@@ -4714,8 +4784,13 @@ function renderCalcIngredientSets(recipe) {
       inp.placeholder = '数値';
       inp.min = '0';
       inp.dataset.ingIdx = ingIdx;
+      inp.dataset.tint = ingIdx % 5;
       inp.value = set.values[ingIdx] || '';
-      inp.addEventListener('focus', () => { set.activeInputIdx = ingIdx; });
+      inp.addEventListener('focus', () => {
+        set.activeInputIdx = ingIdx;
+        activeCalcSetRef = { set, setDiv, recipe };
+        highlightActiveInput(setDiv, ingIdx);
+      });
       inp.addEventListener('input', () => {
         set.values[ingIdx] = inp.value;
         set.lastEditedIdx = inp.value ? ingIdx : null;
@@ -4752,6 +4827,7 @@ function renderCalcIngredientSets(recipe) {
         set.values[idx] = inp2.value;
         set.lastEditedIdx = idx;
         updateCalcIngredientSet(set, recipe, setDiv);
+        highlightActiveInput(setDiv, idx);
       });
       btnRow.appendChild(b);
     });
@@ -4763,6 +4839,7 @@ function renderCalcIngredientSets(recipe) {
       const inputs = setDiv.querySelectorAll('.calc-ing-input');
       inputs.forEach((inp2, idx) => { inp2.value = ''; set.values[idx] = ''; });
       set.lastEditedIdx = null;
+      highlightActiveInput(setDiv, null);
     });
     btnRow.appendChild(resetB);
     setDiv.appendChild(btnRow);
@@ -5410,11 +5487,66 @@ function hideError(id)      { document.getElementById(id).classList.remove('show
 })();
 
 document.getElementById('btn-calc-home').addEventListener('click', () => {
+  if (_calcVVCleanup) { _calcVVCleanup(); _calcVVCleanup = null; }
   currentFolderView = null;
   historyStack = ['list'];
   renderRecipeList();
   showScreen('list', false);
 });
+
+// ============================================================
+// Floating calc toolbar event handling
+// ============================================================
+(function() {
+  const tb = document.getElementById('calc-floating-toolbar');
+
+  // Prevent focus loss (= keyboard dismissal) when tapping toolbar buttons
+  tb.querySelectorAll('[data-toolbar-delta]').forEach(btn => {
+    btn.tabIndex = -1;
+    btn.addEventListener('mousedown', e => e.preventDefault());
+  });
+
+  function handleToolbarAction(btn) {
+    if (!activeCalcSetRef) return;
+    const { set, setDiv, recipe } = activeCalcSetRef;
+    const delta = parseInt(btn.dataset.toolbarDelta, 10);
+    const idx = set.activeInputIdx !== null ? set.activeInputIdx
+              : set.lastEditedIdx   !== null ? set.lastEditedIdx : 0;
+    const inputs = setDiv.querySelectorAll('.calc-ing-input');
+    const inp2 = inputs[idx];
+    if (!inp2) return;
+    if (delta === 0) {
+      inputs.forEach((el, i) => { el.value = ''; set.values[i] = ''; });
+      set.lastEditedIdx = null;
+      highlightActiveInput(setDiv, null);
+    } else {
+      inp2.value = (parseFloat(inp2.value) || 0) + delta;
+      set.values[idx] = inp2.value;
+      set.lastEditedIdx = idx;
+      updateCalcIngredientSet(set, recipe, setDiv);
+      highlightActiveInput(setDiv, idx);
+    }
+  }
+
+  // touchend handles mobile (touchstart preventDefault keeps keyboard up)
+  tb.addEventListener('touchstart', e => {
+    if (e.target.closest('[data-toolbar-delta]')) e.preventDefault();
+  }, { passive: false });
+  let _tbLastTouch = 0;
+  tb.addEventListener('touchend', e => {
+    const btn = e.target.closest('[data-toolbar-delta]');
+    if (!btn) return;
+    e.preventDefault();
+    _tbLastTouch = Date.now();
+    handleToolbarAction(btn);
+  });
+  // click handles desktop (skipped if just handled via touch)
+  tb.addEventListener('click', e => {
+    if (Date.now() - _tbLastTouch < 400) return;
+    const btn = e.target.closest('[data-toolbar-delta]');
+    if (btn) handleToolbarAction(btn);
+  });
+})();
 
 // ============================================================
 // Init
