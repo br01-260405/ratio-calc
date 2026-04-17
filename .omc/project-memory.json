@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776095052753,
+  "projectRoot": "S:\\Claude generated\\ratio calc",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "assets"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 0,
+      "lastAccessed": 1776095052735,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "index.html",
+      "accessCount": 25,
+      "lastAccessed": 1776118181069,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

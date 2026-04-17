@@ -184,7 +184,28 @@
     font-weight: 700;
     color: #2d3748;
     margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 200;
   }
+  .btn-list-sort {
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    min-height: 26px;
+    line-height: 1;
+    color: #fff;
+    background: #4A90D9;
+    flex-shrink: 0;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .btn-list-sort:hover { opacity: 0.85; }
+  .btn-list-sort.sort-active { background: #38a169; }
   .recipe-list { display: flex; flex-direction: column; gap: 10px; }
   .recipe-card {
     background: #fff;
@@ -1480,7 +1501,6 @@
     </div>
     <div class="header-title" id="header-title">比率計算アプリ</div>
     <div class="header-right">
-      <button class="btn-sort" id="btn-sort" style="display:none" aria-label="並び替え">⇅</button>
       <button class="btn-settings" id="btn-settings" aria-label="設定">⚙</button>
     </div>
   </header>
@@ -1890,8 +1910,8 @@ let tagModalSelectedColor = TAG_PRESET_COLORS[0];
 let tagBulkDeleteMode  = false;
 const checkedTagIds    = new Set();
 
-// Tag sort mode
-let tagSortMode        = false;
+// Sort mode: 'tags' | 'folders' | 'recipes' | null
+let sortMode           = null;
 let tagSortDragSrcId   = null;
 let tagSortDragGroup   = null;
 let tagSortFloatEl     = null;
@@ -1974,8 +1994,6 @@ function showScreen(name, push = true) {
   }
   btnBack.style.display = historyStack.length > 1 ? '' : 'none';
   btnSettingsHeader.style.display = name === 'settings' ? 'none' : '';
-  const _btnSort = document.getElementById('btn-sort');
-  if (_btnSort) _btnSort.style.display = (name === 'list' || name === 'folder-view') ? '' : 'none';
   updateHeaderTitle(name);
 }
 
@@ -1990,14 +2008,12 @@ function updateHeaderTitle(screenName) {
 }
 
 function clearTagSortMode() {
-  if (tagSortMode) {
-    tagSortMode = false;
+  if (sortMode !== null) {
+    sortMode = null;
     const ov = document.getElementById('tag-sort-overlay');
     if (ov) ov.remove();
     const bar = document.getElementById('tag-filter-bar');
     if (bar) bar.classList.remove('sort-active');
-    const btnSort = document.getElementById('btn-sort');
-    if (btnSort) { btnSort.textContent = '⇅'; btnSort.classList.remove('sort-active'); }
   }
 }
 
@@ -2024,16 +2040,6 @@ function goBack() {
 }
 
 btnBack.addEventListener('click', goBack);
-
-// Sort button (header) — unified sort mode for tags, recipes and folders
-const btnSortHeader = document.getElementById('btn-sort');
-btnSortHeader.addEventListener('click', () => {
-  tagSortMode = !tagSortMode;
-  btnSortHeader.textContent = tagSortMode ? '✓ 完了' : '⇅';
-  btnSortHeader.classList.toggle('sort-active', tagSortMode);
-  renderTagFilterBar();
-  renderRecipeList();
-});
 
 // Android hardware back button
 history.pushState(null, '', '');
@@ -2149,26 +2155,25 @@ function renderTagFilterBar() {
     if (groups.length === 0) return;
   }
 
-  if (tagSortMode) bar.classList.add('sort-active');
-  else bar.classList.remove('sort-active');
+  bar.classList.remove('sort-active');
 
-  // Outer wrapper (visual in normal mode, transparent in sort-active via CSS)
+  // Outer wrapper
   const outer = document.createElement('div');
   outer.className = 'tag-filter-outer';
 
-  // Button row: [title (flex:1)] [OR/AND] [並べ替え]
+  // Button row: title + OR/AND toggle (only in normal mode)
   const btnRow = document.createElement('div');
   btnRow.className = 'tag-sort-btn-row';
   const titleSpan = document.createElement('span');
   titleSpan.className = 'tag-filter-section-title';
-  titleSpan.textContent = 'タグで絞り込み';
+  titleSpan.textContent = sortMode === 'all' ? '≡ タグ' : 'タグで絞り込み';
   btnRow.appendChild(titleSpan);
-  if (!tagSortMode) btnRow.appendChild(makeOrAndToggle());
+  if (sortMode === null) btnRow.appendChild(makeOrAndToggle());
   outer.appendChild(btnRow);
 
   if (contextTags !== null) {
     // ── Folder view: flat chip list ──
-    if (tagSortMode) {
+    if (sortMode === 'all') {
       const area = document.createElement('div');
       area.className = 'tag-filter-area';
       const row = document.createElement('div');
@@ -2185,7 +2190,7 @@ function renderTagFilterBar() {
     }
   } else {
     // ── Main list ──
-    if (tagSortMode) {
+    if (sortMode === 'all') {
       // Sort mode: flat rows with group labels (needed for drag-and-drop)
       const area = document.createElement('div');
       area.className = 'tag-filter-area';
@@ -2236,15 +2241,9 @@ function renderTagFilterBar() {
 
   bar.appendChild(outer);
 
-  // Sort overlay
+  // Remove any lingering sort overlay
   const existingOv = document.getElementById('tag-sort-overlay');
-  if (tagSortMode && !existingOv) {
-    const overlay = document.createElement('div');
-    overlay.id = 'tag-sort-overlay';
-    document.getElementById('app').appendChild(overlay);
-  } else if (!tagSortMode && existingOv) {
-    existingOv.remove();
-  }
+  if (existingOv) existingOv.remove();
 }
 
 function makeOrAndToggle() {
@@ -2342,8 +2341,8 @@ function startTagSortDrag(chip, tag, group, startX, startY) {
   chip.parentNode.insertBefore(ph, chip);
   tagSortPlaceholder = ph;
 
-  // Hide original
-  chip.style.visibility = 'hidden';
+  // Hide original (display:none so it takes no space; placeholder fills the slot)
+  chip.style.display = 'none';
 
   function onMove(clientX, clientY) {
     // Clamp float position to .tag-filter-area container bounds
@@ -2413,7 +2412,7 @@ function startTagSortDrag(chip, tag, group, startX, startY) {
     if (!newOrder.includes(tag.id)) newOrder.push(tag.id);
 
     ph.remove();
-    chip.style.visibility = '';
+    chip.style.display = '';
     tagSortSrcChip = null;
     tagSortPlaceholder = null;
 
@@ -2896,9 +2895,38 @@ function renderRecipeList() {
   const titleEl = document.getElementById('list-screen-title');
   const folderBtn = document.getElementById('btn-new-folder');
 
+  function setTitle(text) {
+    titleEl.innerHTML = '';
+    const s = document.createElement('span');
+    s.textContent = text;
+    titleEl.appendChild(s);
+    if (!searchQuery) {
+      const sortBtn = document.createElement('button');
+      sortBtn.type = 'button';
+      sortBtn.className = 'btn-list-sort' + (sortMode !== null ? ' sort-active' : '');
+      sortBtn.textContent = sortMode !== null ? '✓ 完了' : '並べ替え';
+      sortBtn.addEventListener('click', () => {
+        if (sortMode !== null) {
+          sortMode = null;
+          renderTagFilterBar();
+          renderRecipeList();
+        } else if (currentFolderView !== null) {
+          sortMode = 'recipes';
+          renderTagFilterBar();
+          renderRecipeList();
+        } else {
+          sortMode = 'all';
+          renderTagFilterBar();
+          renderRecipeList();
+        }
+      });
+      titleEl.appendChild(sortBtn);
+    }
+  }
+
   // === Search mode: flat list across all recipes ===
   if (searchQuery) {
-    titleEl.textContent = 'レシピ一覧';
+    setTitle('レシピ一覧');
     folderBtn.style.display = '';
     let results = getSearchedRecipes([...recipes].sort((a, b) => a.order - b.order));
     results = getFilteredRecipes(results);
@@ -2920,7 +2948,7 @@ function renderRecipeList() {
   if (currentFolderView !== null) {
     // === Folder contents view ===
     const folder = folders.find(f => f.id === currentFolderView);
-    titleEl.textContent = folder ? folder.name : 'フォルダ';
+    setTitle(folder ? folder.name : 'フォルダ');
     folderBtn.style.display = 'none';
 
     let folderRecipes = recipes
@@ -2945,13 +2973,19 @@ function renderRecipeList() {
         countEl.textContent = `${folderRecipes.length}件`;
         container.appendChild(countEl);
       }
+      if (sortMode === 'recipes') {
+        const rh = document.createElement('div');
+        rh.className = 'list-section-divider';
+        rh.innerHTML = '<span class="list-section-label">≡ レシピ</span>';
+        container.appendChild(rh);
+      }
       renderRecipeCards(container, folderRecipes);
     }
     return;
   }
 
   // === Main list view ===
-  titleEl.textContent = 'レシピ一覧';
+  setTitle('レシピ一覧');
   folderBtn.style.display = '';
 
   const hasFolders   = folders.length > 0;
@@ -2985,17 +3019,31 @@ function renderRecipeList() {
     empty.innerHTML = '<div class="empty-icon">📋</div><p>まだレシピがありません。<br>新規登録してみましょう！</p>';
     listOuter.appendChild(empty);
   } else if (hasFolders) {
+    if (sortMode === 'all') {
+      const fh = document.createElement('div');
+      fh.className = 'list-section-divider';
+      fh.innerHTML = '<span class="list-section-label">≡ フォルダ</span>';
+      listOuter.appendChild(fh);
+    }
     renderFolderCards(listOuter);
 
     const unassigned = recipes.filter(r => !r.folderId).sort((a, b) => a.order - b.order);
     if (unassigned.length > 0) {
       const div = document.createElement('div');
       div.className = 'list-section-divider';
-      div.innerHTML = '<span class="list-section-label">フォルダなし</span>';
+      div.innerHTML = sortMode === 'all'
+        ? '<span class="list-section-label">≡ レシピ（フォルダなし）</span>'
+        : '<span class="list-section-label">フォルダなし</span>';
       listOuter.appendChild(div);
       renderRecipeCards(listOuter, unassigned);
     }
   } else {
+    if (sortMode === 'all') {
+      const rh = document.createElement('div');
+      rh.className = 'list-section-divider';
+      rh.innerHTML = '<span class="list-section-label">≡ レシピ</span>';
+      listOuter.appendChild(rh);
+    }
     renderRecipeCards(listOuter, [...recipes].sort((a, b) => a.order - b.order));
   }
 
@@ -3373,7 +3421,7 @@ function renderFolderCards(container) {
       }, '.btn-recipe-menu');
     }
 
-    if (tagSortMode && !bulkEditMode) {
+    if (sortMode === 'all' && !bulkEditMode) {
       card.style.cursor = 'grab';
       card.style.userSelect = 'none';
       card.style.touchAction = 'none';
@@ -3474,7 +3522,7 @@ function renderRecipeCards(container, sortedRecipes) {
   if (bulkEditMode) return;
 
   // Sort mode: float+swap drag behavior
-  if (tagSortMode) {
+  if (sortMode === 'recipes' || sortMode === 'all') {
     container.querySelectorAll('.recipe-card').forEach(card => {
       const id = card.dataset.id;
       card.style.cursor = 'grab';
@@ -3556,6 +3604,7 @@ function startListSortDrag(card, type, id, startX, startY) {
   ph.style.cssText = `height:${rect.height}px;visibility:hidden;flex-shrink:0;`;
   card.parentNode.insertBefore(ph, card);
   card.classList.add('list-sort-dragging');
+  card.style.display = 'none';
 
   function onMove(clientX, clientY) {
     const newLeft = clientX - offsetX;
@@ -3594,20 +3643,19 @@ function startListSortDrag(card, type, id, startX, startY) {
     document.removeEventListener('touchcancel', onTE);
 
     floatEl.remove();
+    card.style.display = '';
     card.classList.remove('list-sort-dragging');
 
     const phParent = ph.parentNode;
     if (!phParent) { ph.remove(); return; }
 
-    const allCards = [...phParent.querySelectorAll(
-      type === 'recipe' ? '.recipe-card' : '.folder-card'
-    )];
-
+    // Build new order by reading DOM children in order;
+    // ph marks the drop position, card (now visible) is skipped as it comes from ph
     const newOrderIds = [];
-    allCards.forEach(el => {
-      if (el.dataset.sortPlaceholder) {
+    [...phParent.children].forEach(el => {
+      if (el === ph) {
         newOrderIds.push(id);
-      } else {
+      } else if (el !== card) {
         const elId = type === 'recipe' ? el.dataset.id : el.dataset.folderId;
         if (elId) newOrderIds.push(elId);
       }
@@ -3630,6 +3678,7 @@ function startListSortDrag(card, type, id, startX, startY) {
       saveFolders();
     }
     showToast('順序を変更しました');
+    renderRecipeList();
   }
 
   function onMM(e) { onMove(e.clientX, e.clientY); }
@@ -3705,7 +3754,6 @@ function saveFolderModal() {
       saveFolders();
       if (currentFolderView === folderModalTargetId) {
         document.getElementById('header-title').textContent = name;
-        document.getElementById('list-screen-title').textContent = name;
       }
       renderRecipeList();
       showToast('フォルダ名を変更しました');
